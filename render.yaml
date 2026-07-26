@@ -2,8 +2,7 @@ services:
   - type: web
     name: eventora-api
     runtime: node
-    rootDir: server
-    buildCommand: npm ci
+    buildCommand: npm ci && npm run build
     startCommand: npm start
     healthCheckPath: /health
     envVars:
@@ -14,16 +13,4 @@ services:
       - key: EMAIL_USER
         sync: false
       - key: EMAIL_PASS
-        sync: false
-      - key: CLIENT_URL
-        sync: false
-
-  - type: web
-    name: eventora-client
-    runtime: static
-    rootDir: client
-    buildCommand: npm ci && npm run build
-    staticPublishPath: ./dist
-    envVars:
-      - key: VITE_API_URL
         sync: false

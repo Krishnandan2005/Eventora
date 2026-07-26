@@ -3,6 +3,8 @@ import mongoose from 'mongoose';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import dns from 'dns';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
 dns.setServers([
   "1.1.1.1",
@@ -16,6 +18,7 @@ import eventRoutes from './routes/events.js';
 import bookingRoutes from './routes/bookings.js';
 
 const app = express();
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // Middleware
 app.use(cors({
@@ -31,6 +34,13 @@ app.get('/health', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/events', eventRoutes);
 app.use('/api/bookings', bookingRoutes);
+
+// Production: serve the Vite build from the same Render web service.
+const clientDistPath = path.join(__dirname, '../client/dist');
+app.use(express.static(clientDistPath));
+app.get(/.*/, (req, res) => {
+  res.sendFile(path.join(clientDistPath, 'index.html'));
+});
 
 // Database Connection
 mongoose.connect(process.env.MONGO_URI)
