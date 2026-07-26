@@ -23,10 +23,11 @@ export const AuthProvider = ({ children }) => {
             localStorage.setItem('token', data.token);
             return data;
         } catch (error) {
-            if (error.response?.data?.needsVerification) {
-                throw error.response.data;
+            const errMsg = error.response?.data?.error || 'Login failed';
+            if (errMsg.includes('not verified')) {
+                throw { needsVerification: true, message: errMsg };
             }
-            throw { message: error.response?.data?.message || 'Login failed' };
+            throw { message: errMsg };
         }
     };
 
@@ -35,7 +36,7 @@ export const AuthProvider = ({ children }) => {
             const { data } = await api.post('/auth/register', { name, email, password });
             return data; // Returns { message, email }
         } catch (error) {
-            throw { message: error.response?.data?.message || 'Registration failed' };
+            throw { message: error.response?.data?.error || 'Registration failed' };
         }
     };
 
@@ -47,7 +48,7 @@ export const AuthProvider = ({ children }) => {
             localStorage.setItem('token', data.token);
             return data;
         } catch (error) {
-            throw { message: error.response?.data?.message || 'OTP verification failed' };
+            throw { message: error.response?.data?.error || 'OTP verification failed' };
         }
     };
 
