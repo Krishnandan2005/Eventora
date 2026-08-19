@@ -7,6 +7,8 @@ const Login = () => {
     const [password, setPassword] = useState('');
     const [otp, setOtp] = useState('');
     const [showOTP, setShowOTP] = useState(false);
+    const [loginAsAdmin, setLoginAsAdmin] = useState(false);
+    const [adminCode, setAdminCode] = useState('');
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
 
@@ -19,7 +21,12 @@ const Login = () => {
         setError('');
         try {
             if (!showOTP) {
-                const data = await login(email, password);
+                const data = await login(
+                    email,
+                    password,
+                    loginAsAdmin,
+                    loginAsAdmin ? adminCode : undefined
+                );
                 if (data.role === 'admin') navigate('/admin');
                 else navigate('/dashboard');
             } else {
@@ -71,6 +78,33 @@ const Login = () => {
                                 onChange={(e) => setPassword(e.target.value)}
                             />
                         </div>
+
+                        <div className="flex items-center">
+                            <input
+                                id="loginAsAdmin"
+                                type="checkbox"
+                                className="h-4 w-4 rounded border-gray-300 text-gray-900 focus:ring-gray-700"
+                                checked={loginAsAdmin}
+                                onChange={(e) => setLoginAsAdmin(e.target.checked)}
+                            />
+                            <label htmlFor="loginAsAdmin" className="ml-2 text-sm text-gray-700">
+                                Login as Admin
+                            </label>
+                        </div>
+
+                        {loginAsAdmin && (
+                            <div>
+                                <label className="block text-sm font-semibold text-gray-700 mb-2">Admin Secret Code</label>
+                                <input
+                                    type="password"
+                                    required
+                                    placeholder="Enter admin code"
+                                    className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-gray-700 focus:border-gray-700 transition shadow-sm"
+                                    value={adminCode}
+                                    onChange={(e) => setAdminCode(e.target.value)}
+                                />
+                            </div>
+                        )}
                     </>
                 ) : (
                     <div>

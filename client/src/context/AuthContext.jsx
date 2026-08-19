@@ -15,9 +15,9 @@ export const AuthProvider = ({ children }) => {
         setLoading(false);
     }, []);
 
-    const login = async (email, password) => {
+    const login = async (email, password, loginAsAdmin, adminCode) => {
         try {
-            const { data } = await api.post('/auth/login', { email, password });
+            const { data } = await api.post('/auth/login', { email, password, loginAsAdmin, adminCode });
             setUser(data);
             localStorage.setItem('userInfo', JSON.stringify(data));
             localStorage.setItem('token', data.token);
@@ -31,9 +31,9 @@ export const AuthProvider = ({ children }) => {
         }
     };
 
-    const register = async (name, email, password) => {
+    const register = async (name, email, password, role, adminCode) => {
         try {
-            const { data } = await api.post('/auth/register', { name, email, password });
+            const { data } = await api.post('/auth/register', { name, email, password, role, adminCode });
             return data; // Returns { message, email }
         } catch (error) {
             throw { message: error.response?.data?.error || 'Registration failed' };

@@ -4,21 +4,31 @@ import { sendOTPEmail } from '../utils/email.js';
 import Otp from '../models/OTP.models.js';
 import jwt from 'jsonwebtoken';
 
-// generate token 
+// generate token
 const generateToken = (id, role) => {
     return jwt.sign({ id, role }, process.env.JWT_SECRET, { expiresIn: '7d' });
 };
 
 // register user
 const registerUser = async (req, res) => {
-    const { name, email, password } = req.body;
+    const { name, email, password, role, adminCode } = req.body;
     try {
+        // Only allow role: 'admin' if the correct secret code is provided.
+        // Otherwise, always fall back to 'user' — never trust the client blindly.
+        let finalRole = 'user';
+        if (role === 'admin') {
+            if (adminCode !== process.env.ADMIN_SECRET_CODE) {
+                return res.status(403).json({ error: 'Invalid admin code' });
+            }
+            finalRole = 'admin';
+        }
+
         const hashedPassword = await bcrypt.hash(password, 10);
         const user = await User.create({
             name,
             email,
             password: hashedPassword,
-            role: 'user',
+            role: finalRole,
             isVerified: false,
         });
 
@@ -39,7 +49,7 @@ const registerUser = async (req, res) => {
 
 // login user
 const loginUser = async (req, res) => {
-    const { email, password } = req.body;
+    const { email, password, loginAsAdmin, adminCode } = req.body;
     try {
         const user = await User.findOne({ email });
         if (!user) {
@@ -49,6 +59,18 @@ const loginUser = async (req, res) => {
         const isMatch = await bcrypt.compare(password, user.password);
         if (!isMatch) {
             return res.status(400).json({ error: 'Invalid credentials' });
+        }
+
+        // If user is trying to log in as admin, verify both:
+        // 1. Their account actually has the admin role
+        // 2. They know the current admin secret code
+        if (loginAsAdmin) {
+            if (user.role !== 'admin') {
+                return res.status(403).json({ error: 'This account is not registered as admin' });
+            }
+            if (adminCode !== process.env.ADMIN_SECRET_CODE) {
+                return res.status(403).json({ error: 'Invalid admin code' });
+            }
         }
 
         if (!user.isVerified) {
