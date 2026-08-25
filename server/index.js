@@ -3,62 +3,107 @@ import mongoose from 'mongoose';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import dns from 'dns';
-import path from 'path';
-import { fileURLToPath } from 'url';
-
-dns.setServers(["1.1.1.1", "8.8.8.8"]);
-dotenv.config();
 
 import authRoutes from './routes/auth.js';
 import eventRoutes from './routes/events.js';
 import bookingRoutes from './routes/bookings.js';
 
-const app = express();
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+dns.setServers(['1.1.1.1', '8.8.8.8']);
+dotenv.config();
 
+const app = express();
+
+// ─────────────────────────────────────────────
+// CORS
+// ─────────────────────────────────────────────
+
+const allowedOrigins = [
+    'http://localhost:5173',
+    'http://localhost:3000',
+    'https://eventora-client-liard.vercel.app',
+];
+
+app.use(
+    cors({
+        origin: (origin, callback) => {
+            // Allow requests with no Origin header
+            // e.g. Postman/server-to-server requests
+            if (!origin) {
+                return callback(null, true);
+            }
+
+            if (allowedOrigins.includes(origin)) {
+                return callback(null, true);
+            }
+
+            console.error(`CORS blocked: ${origin}`);
+            return callback(new Error(`CORS blocked for origin: ${origin}`));
+        },
+        credentials: true,
+        methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+        allowedHeaders: ['Content-Type', 'Authorization'],
+    })
+);
+
+// ─────────────────────────────────────────────
 // Middleware
-app.use(cors({ origin: process.env.CLIENT_URL || '*' }));
+// ─────────────────────────────────────────────
+
 app.use(express.json());
 
-// Health check
-app.get('/health', (req, res) => res.status(200).send('OK'));
+// ─────────────────────────────────────────────
+// Health Check
+// ─────────────────────────────────────────────
 
+app.get('/health', (req, res) => {
+    res.status(200).json({
+        status: 'OK',
+        message: 'Eventora API is running',
+    });
+});
+
+// ─────────────────────────────────────────────
 // API Routes
+// ─────────────────────────────────────────────
+
 app.use('/api/auth', authRoutes);
 app.use('/api/events', eventRoutes);
 app.use('/api/bookings', bookingRoutes);
 
-// Serve frontend build (monolithic)
-const clientDist = path.join(__dirname, '../client/dist');
-app.use(express.static(clientDist));
-app.get('/*splat', (req, res) => {
-  res.sendFile(path.join(clientDist, 'index.html'));
-});
+// ─────────────────────────────────────────────
+// MongoDB Connection
+// ─────────────────────────────────────────────
 
-// --- Database connection (cached across serverless invocations) ---
-// Without this cache, every cold start opens a brand new connection,
-// and under real traffic you'll blow through MongoDB Atlas's connection
-// limit fast. Reusing a cached promise keeps one connection warm.
 let cachedConnection = global._mongooseConnection;
+
 if (!cachedConnection) {
-  cachedConnection = global._mongooseConnection = mongoose
-    .connect(process.env.MONGO_URI)
-    .then((m) => {
-      console.log('MongoDB Connected Successfully !!!');
-      return m;
-    })
-    .catch((err) => {
-      console.error('MongoDB Connection Error:', err);
-      global._mongooseConnection = null; // allow retry on next invocation
-      throw err;
+    cachedConnection = global._mongooseConnection = mongoose
+        .connect(process.env.MONGO_URI)
+        .then((connection) => {
+            console.log('MongoDB Connected Successfully !!!');
+            return connection;
+        })
+        .catch((error) => {
+            console.error('MongoDB Connection Error:', error);
+            global._mongooseConnection = null;
+            throw error;
+        });
+}
+
+// ─────────────────────────────────────────────
+// Local Development
+// ─────────────────────────────────────────────
+
+if (process.env.VERCEL !== '1') {
+    const PORT = process.env.PORT || 5000;
+
+    app.listen(PORT, () => {
+        console.log(`Server running on port ${PORT}`);
     });
 }
 
-// --- Local dev only: Vercel invokes the exported app directly and never
-// needs app.listen(). Guard it so running `node index.js` locally still works. ---
-if (process.env.VERCEL !== '1') {
-  const PORT = process.env.PORT || 5000;
-  app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
-}
+// ─────────────────────────────────────────────
+// Export for Vercel
+// ─────────────────────────────────────────────
 
 export default app;
