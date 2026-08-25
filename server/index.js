@@ -20,14 +20,13 @@ const app = express();
 const allowedOrigins = [
     'http://localhost:5173',
     'http://localhost:3000',
-    'https://eventora-client-liard.vercel.app',
-];
+    process.env.CLIENT_URL,
+].filter(Boolean);
 
 app.use(
     cors({
         origin: (origin, callback) => {
-            // Allow requests with no Origin header
-            // e.g. Postman/server-to-server requests
+            // Allow requests without an Origin header
             if (!origin) {
                 return callback(null, true);
             }
@@ -44,7 +43,6 @@ app.use(
         allowedHeaders: ['Content-Type', 'Authorization'],
     })
 );
-
 // ─────────────────────────────────────────────
 // Middleware
 // ─────────────────────────────────────────────
