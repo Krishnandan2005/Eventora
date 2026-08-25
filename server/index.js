@@ -8,8 +8,9 @@ import authRoutes from './routes/auth.js';
 import eventRoutes from './routes/events.js';
 import bookingRoutes from './routes/bookings.js';
 
-dns.setServers(['1.1.1.1', '8.8.8.8']);
 dotenv.config();
+
+dns.setServers(['1.1.1.1', '8.8.8.8']);
 
 const app = express();
 
@@ -17,17 +18,12 @@ app.use(
     cors({
         origin: 'https://eventora-client-liard.vercel.app',
         credentials: true,
+        methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+        allowedHeaders: ['Content-Type', 'Authorization'],
     })
 );
-// ─────────────────────────────────────────────
-// Middleware
-// ─────────────────────────────────────────────
 
 app.use(express.json());
-
-// ─────────────────────────────────────────────
-// Health Check
-// ─────────────────────────────────────────────
 
 app.get('/health', (req, res) => {
     res.status(200).json({
@@ -36,13 +32,11 @@ app.get('/health', (req, res) => {
     });
 });
 
-// ─────────────────────────────────────────────
-// API Routes
-// ─────────────────────────────────────────────
-
 app.use('/api/auth', authRoutes);
 app.use('/api/events', eventRoutes);
 app.use('/api/bookings', bookingRoutes);
+
+// MongoDB connection...
 
 // ─────────────────────────────────────────────
 // MongoDB Connection
