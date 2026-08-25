@@ -13,34 +13,10 @@ dotenv.config();
 
 const app = express();
 
-// ─────────────────────────────────────────────
-// CORS
-// ─────────────────────────────────────────────
-
-const allowedOrigins = [
-    'http://localhost:5173',
-    'http://localhost:3000',
-    process.env.CLIENT_URL,
-].filter(Boolean);
-
 app.use(
     cors({
-        origin: (origin, callback) => {
-            // Allow requests without an Origin header
-            if (!origin) {
-                return callback(null, true);
-            }
-
-            if (allowedOrigins.includes(origin)) {
-                return callback(null, true);
-            }
-
-            console.error(`CORS blocked: ${origin}`);
-            return callback(new Error(`CORS blocked for origin: ${origin}`));
-        },
+        origin: 'https://eventora-client-liard.vercel.app',
         credentials: true,
-        methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-        allowedHeaders: ['Content-Type', 'Authorization'],
     })
 );
 // ─────────────────────────────────────────────
