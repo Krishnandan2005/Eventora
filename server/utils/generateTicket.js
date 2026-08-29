@@ -1,736 +1,668 @@
-import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import QRCode from "qrcode";
+import sharp from "sharp";
 
-export const generateTicketPDF = async (booking) => {
-    const pdfDoc = await PDFDocument.create();
+const WIDTH = 1011;
+const HEIGHT = 1654;
 
-    // Landscape ticket
-    const page = pdfDoc.addPage([842, 595]);
-    const { width, height } = page.getSize();
+const escapeXml = (value = "") =>
+    String(value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&apos;");
 
-    // =========================================================
-    // FONTS
-    // =========================================================
+const formatDate = (date) => {
+    if (!date) return "N/A";
 
-    const regularFont = await pdfDoc.embedFont(
-        StandardFonts.Helvetica
-    );
+    const d = new Date(date);
 
-    const boldFont = await pdfDoc.embedFont(
-        StandardFonts.HelveticaBold
-    );
+    if (isNaN(d.getTime())) return String(date);
 
-    // =========================================================
-    // COLORS
-    // =========================================================
+    return d.toLocaleDateString("en-GB", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+    }).toUpperCase();
+};
 
-    const navy = rgb(0.025, 0.035, 0.13);
-    const deepPurple = rgb(0.24, 0.08, 0.65);
-    const purple = rgb(0.38, 0.18, 0.95);
-    const lightPurple = rgb(0.95, 0.93, 1);
-    const white = rgb(1, 1, 1);
-    const black = rgb(0.04, 0.05, 0.10);
-    const darkGray = rgb(0.25, 0.27, 0.34);
-    const gray = rgb(0.50, 0.52, 0.58);
-    const borderGray = rgb(0.86, 0.86, 0.90);
-    const green = rgb(0.02, 0.62, 0.34);
-
-    // =========================================================
-    // OUTER BORDER
-    // =========================================================
-
-    page.drawRectangle({
-        x: 15,
-        y: 15,
-        width: width - 30,
-        height: height - 30,
-        color: white,
-        borderColor: navy,
-        borderWidth: 2,
-    });
-
-    // =========================================================
-    // LEFT CONTENT WIDTH
-    // =========================================================
-
-    const leftWidth = 555;
-
-    // =========================================================
-    // HEADER / EVENT IMAGE AREA
-    // =========================================================
-
-    page.drawRectangle({
-        x: 17,
-        y: height - 255,
-        width: leftWidth,
-        height: 238,
-        color: navy,
-    });
-
-    // =========================================================
-    // EVENT IMAGE
-    // =========================================================
-
+const fetchImageAsDataUri = async (url) => {
     try {
-        const imageUrl = booking.eventId.imageUrl;
+        const response = await fetch(url);
 
-        if (imageUrl) {
-            const response = await fetch(imageUrl);
-
-            if (!response.ok) {
-                throw new Error(
-                    `Image request failed: ${response.status}`
-                );
-            }
-
-            const imageBuffer = await response.arrayBuffer();
-
-            const contentType =
-                response.headers.get("content-type") || "";
-
-            let eventImage;
-
-            if (contentType.includes("png")) {
-                eventImage = await pdfDoc.embedPng(imageBuffer);
-            } else if (
-                contentType.includes("jpeg") ||
-                contentType.includes("jpg")
-            ) {
-                eventImage = await pdfDoc.embedJpg(imageBuffer);
-            } else {
-                throw new Error(
-                    `Unsupported image type: ${contentType}`
-                );
-            }
-
-            // Image area
-            const imageX = 270;
-            const imageY = height - 255;
-            const imageWidth = 300;
-            const imageHeight = 238;
-
-            // Fit image while preserving aspect ratio
-            const imageDims = eventImage.scale(1);
-
-            const imageScale = Math.max(
-                imageWidth / imageDims.width,
-                imageHeight / imageDims.height
-            );
-
-            const scaledWidth =
-                imageDims.width * imageScale;
-
-            const scaledHeight =
-                imageDims.height * imageScale;
-
-            const imageDrawX =
-                imageX +
-                (imageWidth - scaledWidth) / 2;
-
-            const imageDrawY =
-                imageY +
-                (imageHeight - scaledHeight) / 2;
-
-            page.drawImage(eventImage, {
-                x: imageDrawX,
-                y: imageDrawY,
-                width: scaledWidth,
-                height: scaledHeight,
-            });
-
-            // Dark transparent overlay
-            page.drawRectangle({
-                x: imageX,
-                y: imageY,
-                width: imageWidth,
-                height: imageHeight,
-                color: navy,
-                opacity: 0.40,
-            });
+        if (!response.ok) {
+            throw new Error(`Image fetch failed: ${response.status}`);
         }
+
+        const arrayBuffer = await response.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
+
+        const metadata = await sharp(buffer).metadata();
+
+        let mime = "image/jpeg";
+
+        if (metadata.format === "png") mime = "image/png";
+        if (metadata.format === "webp") mime = "image/webp";
+
+        return `data:${mime};base64,${buffer.toString("base64")}`;
     } catch (error) {
-        console.error(
-            "Event image could not be loaded:",
-            error.message
-        );
+        console.error("Event image error:", error);
+        return null;
     }
+};
 
-    // =========================================================
-    // BRAND
-    // =========================================================
+export const generateTicketPNG = async (booking) => {
+    const event = booking.eventId;
+    const user = booking.userId;
 
-    // Logo circle
-    page.drawCircle({
-        x: 52,
-        y: height - 58,
-        size: 21,
-        color: deepPurple,
-    });
-
-    page.drawText("E", {
-        x: 44,
-        y: height - 66,
-        size: 17,
-        font: boldFont,
-        color: white,
-    });
-
-    page.drawText("EVENTORA", {
-        x: 82,
-        y: height - 64,
-        size: 25,
-        font: boldFont,
-        color: white,
-    });
-
-    page.drawText(
-        "Your Event, Your Experience",
-        {
-            x: 83,
-            y: height - 84,
-            size: 9,
-            font: regularFont,
-            color: rgb(0.72, 0.74, 0.86),
-        }
-    );
-
-    // =========================================================
-    // CONFIRMED BADGE
-    // =========================================================
-
-    page.drawRectangle({
-        x: 430,
-        y: height - 88,
-        width: 120,
-        height: 32,
-        color: green,
-    });
-
-    page.drawText("CONFIRMED", {
-        x: 447,
-        y: height - 77,
-        size: 10,
-        font: boldFont,
-        color: white,
-    });
-
-    // =========================================================
-    // EVENT LABEL
-    // =========================================================
-
-    page.drawText("EVENT", {
-        x: 45,
-        y: height - 125,
-        size: 10,
-        font: boldFont,
-        color: rgb(0.55, 0.25, 1),
-    });
-
-    // =========================================================
-    // EVENT TITLE
-    // =========================================================
-
-    const wrapText = (
-        text,
-        font,
-        fontSize,
-        maxWidth
-    ) => {
-        const words = String(text).split(" ");
-        const lines = [];
-
-        let current = "";
-
-        for (const word of words) {
-            const test = current
-                ? `${current} ${word}`
-                : word;
-
-            const testWidth =
-                font.widthOfTextAtSize(
-                    test,
-                    fontSize
-                );
-
-            if (testWidth <= maxWidth) {
-                current = test;
-            } else {
-                if (current) {
-                    lines.push(current);
-                }
-
-                current = word;
-            }
-        }
-
-        if (current) {
-            lines.push(current);
-        }
-
-        return lines;
-    };
-
-    const titleLines = wrapText(
-        booking.eventId.title,
-        boldFont,
-        26,
-        400
-    );
-
-    let titleY = height - 164;
-
-    titleLines.slice(0, 2).forEach((line) => {
-        page.drawText(line, {
-            x: 45,
-            y: titleY,
-            size: 26,
-            font: boldFont,
-            color: white,
-        });
-
-        titleY -= 31;
-    });
-
-    // =========================================================
-    // DATE
-    // =========================================================
-
-    page.drawText("DATE", {
-        x: 45,
-        y: height - 220,
-        size: 8,
-        font: boldFont,
-        color: rgb(0.70, 0.72, 0.85),
-    });
-
-    page.drawText(
-        formatDate(booking.eventId.date),
-        {
-            x: 45,
-            y: height - 238,
-            size: 12,
-            font: boldFont,
-            color: white,
-        }
-    );
-
-    // =========================================================
-    // LOCATION
-    // =========================================================
-
-    page.drawText("LOCATION", {
-        x: 190,
-        y: height - 220,
-        size: 8,
-        font: boldFont,
-        color: rgb(0.70, 0.72, 0.85),
-    });
-
-    page.drawText(
-        String(booking.eventId.location),
-        {
-            x: 190,
-            y: height - 238,
-            size: 11,
-            font: boldFont,
-            color: white,
-            maxWidth: 330,
-        }
-    );
-
-    // =========================================================
-    // TICKET DETAILS TITLE
-    // =========================================================
-
-    page.drawText("TICKET DETAILS", {
-        x: 45,
-        y: 315,
-        size: 11,
-        font: boldFont,
-        color: purple,
-    });
-
-    page.drawLine({
-        start: {
-            x: 45,
-            y: 304,
-        },
-        end: {
-            x: 540,
-            y: 304,
-        },
-        thickness: 1,
-        color: borderGray,
-    });
-
-    // =========================================================
-    // DETAIL HELPER
-    // =========================================================
-
-    const drawDetail = (
-        label,
-        value,
-        x,
-        y,
-        valueSize = 11
-    ) => {
-        page.drawText(
-            String(label).toUpperCase(),
-            {
-                x,
-                y,
-                size: 7,
-                font: boldFont,
-                color: gray,
-            }
-        );
-
-        page.drawText(
-            String(value),
-            {
-                x,
-                y: y - 18,
-                size: valueSize,
-                font: boldFont,
-                color: black,
-                maxWidth: 210,
-            }
-        );
-    };
-
-    // =========================================================
-    // DETAILS
-    // =========================================================
-
-    drawDetail(
-        "Attendee",
-        booking.userId.name,
-        45,
-        280
-    );
-
-    drawDetail(
-        "Date",
-        formatDate(booking.eventId.date),
-        300,
-        280
-    );
-
-    page.drawLine({
-        start: {
-            x: 285,
-            y: 255,
-        },
-        end: {
-            x: 285,
-            y: 295,
-        },
-        thickness: 1,
-        color: borderGray,
-    });
-
-    drawDetail(
-        "Location",
-        booking.eventId.location,
-        45,
-        230
-    );
-
-    drawDetail(
-        "Category",
-        booking.eventId.category,
-        300,
-        230
-    );
-
-    page.drawLine({
-        start: {
-            x: 285,
-            y: 205,
-        },
-        end: {
-            x: 285,
-            y: 245,
-        },
-        thickness: 1,
-        color: borderGray,
-    });
-
-    drawDetail(
-        "Ticket Price",
-        `INR ${booking.amount}`,
-        45,
-        180,
-        14
-    );
-
-    drawDetail(
-        "Email",
-        booking.userId.email,
-        300,
-        180,
-        9
-    );
-
-    // =========================================================
-    // FOOTER INFORMATION BOX
-    // =========================================================
-
-    page.drawRectangle({
-        x: 45,
-        y: 45,
-        width: 495,
-        height: 65,
-        color: lightPurple,
-        borderColor: rgb(0.82, 0.77, 0.98),
-        borderWidth: 1,
-    });
-
-    page.drawText("i", {
-        x: 62,
-        y: 77,
-        size: 17,
-        font: boldFont,
-        color: purple,
-    });
-
-    page.drawText(
-        "This ticket is valid only for the event mentioned above.",
-        {
-            x: 82,
-            y: 82,
-            size: 8,
-            font: regularFont,
-            color: darkGray,
-        }
-    );
-
-    page.drawText(
-        "Thank you for choosing Eventora.",
-        {
-            x: 82,
-            y: 62,
-            size: 10,
-            font: boldFont,
-            color: purple,
-        }
-    );
-
-    // =========================================================
-    // QR SIDE
-    // =========================================================
-
-    // Vertical perforated divider
-    page.drawLine({
-        start: {
-            x: 570,
-            y: 45,
-        },
-        end: {
-            x: 570,
-            y: height - 45,
-        },
-        thickness: 1,
-        color: rgb(0.72, 0.72, 0.78),
-        dashArray: [6, 5],
-    });
-
-    // =========================================================
-    // QR HEADING
-    // =========================================================
-
-    page.drawText("SCAN TO VERIFY", {
-        x: 640,
-        y: 485,
-        size: 14,
-        font: boldFont,
-        color: purple,
-    });
-
-    page.drawText(
-        "Present this QR code",
-        {
-            x: 652,
-            y: 460,
-            size: 9,
-            font: regularFont,
-            color: darkGray,
-        }
-    );
-
-    page.drawText(
-        "at the event entrance.",
-        {
-            x: 648,
-            y: 445,
-            size: 9,
-            font: regularFont,
-            color: darkGray,
-        }
-    );
-
-    page.drawLine({
-        start: {
-            x: 620,
-            y: 425,
-        },
-        end: {
-            x: 790,
-            y: 425,
-        },
-        thickness: 1,
-        color: rgb(0.85, 0.82, 0.95),
-    });
-
-    // =========================================================
-    // QR CODE
-    // =========================================================
+    const eventImage = await fetchImageAsDataUri(event.imageUrl);
 
     const qrData = JSON.stringify({
         bookingId: booking._id.toString(),
-        eventId: booking.eventId._id.toString(),
+        eventId: event._id.toString(),
     });
 
-    const qrDataUrl = await QRCode.toDataURL(
-        qrData,
-        {
-            width: 600,
-            margin: 1,
-            errorCorrectionLevel: "H",
-        }
+    const qrDataUrl = await QRCode.toDataURL(qrData, {
+        width: 500,
+        margin: 2,
+        errorCorrectionLevel: "H",
+    });
+
+    const title = escapeXml(event.title);
+    const attendee = escapeXml(user.name);
+    const email = escapeXml(user.email);
+    const date = escapeXml(formatDate(event.date));
+    const location = escapeXml(event.location);
+    const category = escapeXml(event.category);
+    const price = escapeXml(`INR ${booking.amount}`);
+    const bookingId = escapeXml(
+        booking._id.toString().slice(-16).toUpperCase()
     );
 
-    const qrImage = await pdfDoc.embedPng(
-        qrDataUrl
-    );
+    const image = eventImage
+        ? `
+        <defs>
+            <clipPath id="eventImageClip">
+                <rect x="45" y="330" width="921" height="430" rx="30"/>
+            </clipPath>
+        </defs>
 
-    // White QR background
-    page.drawRectangle({
-        x: 615,
-        y: 210,
-        width: 185,
-        height: 195,
-        color: white,
-        borderColor: rgb(0.92, 0.92, 0.95),
-        borderWidth: 1,
-    });
+        <image
+            href="${eventImage}"
+            x="45"
+            y="330"
+            width="921"
+            height="430"
+            preserveAspectRatio="xMidYMid slice"
+            clip-path="url(#eventImageClip)"
+        />
 
-    page.drawImage(qrImage, {
-        x: 625,
-        y: 220,
-        width: 165,
-        height: 165,
-    });
+        <rect
+            x="45"
+            y="330"
+            width="921"
+            height="430"
+            rx="30"
+            fill="url(#imageOverlay)"
+        />
+        `
+        : `
+        <rect
+            x="45"
+            y="330"
+            width="921"
+            height="430"
+            rx="30"
+            fill="#24105f"
+        />
+        `;
 
-    // =========================================================
-    // BOOKING ID
-    // =========================================================
+    const svg = `
+<svg
+    width="${WIDTH}"
+    height="${HEIGHT}"
+    viewBox="0 0 ${WIDTH} ${HEIGHT}"
+    xmlns="http://www.w3.org/2000/svg"
+>
 
-    page.drawText("BOOKING ID", {
-        x: 660,
-        y: 185,
-        size: 8,
-        font: boldFont,
-        color: gray,
-    });
+<defs>
 
-    page.drawText(
-        booking._id
-            .toString()
-            .slice(-16)
-            .toUpperCase(),
-        {
-            x: 635,
-            y: 165,
-            size: 10,
-            font: boldFont,
-            color: purple,
-        }
-    );
+    <linearGradient id="background" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stop-color="#08052D"/>
+        <stop offset="55%" stop-color="#30108F"/>
+        <stop offset="100%" stop-color="#7B16D9"/>
+    </linearGradient>
 
-    page.drawLine({
-        start: {
-            x: 620,
-            y: 135,
-        },
-        end: {
-            x: 790,
-            y: 135,
-        },
-        thickness: 1,
-        color: rgb(0.86, 0.83, 0.94),
-        dashArray: [5, 4],
-    });
+    <linearGradient id="bottomGradient" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0%" stop-color="#3920E8"/>
+        <stop offset="50%" stop-color="#7B20F2"/>
+        <stop offset="100%" stop-color="#F026A8"/>
+    </linearGradient>
 
-    // =========================================================
-    // SECURITY MESSAGE
-    // =========================================================
+    <linearGradient id="imageOverlay" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#05052D" stop-opacity="0.15"/>
+        <stop offset="100%" stop-color="#05052D" stop-opacity="0.65"/>
+    </linearGradient>
 
-    page.drawCircle({
-        x: 645,
-        y: 92,
-        size: 17,
-        color: lightPurple,
-    });
+    <linearGradient id="wave" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0%" stop-color="#F52BA7"/>
+        <stop offset="50%" stop-color="#A52AF4"/>
+        <stop offset="100%" stop-color="#FF9E20"/>
+    </linearGradient>
 
-    page.drawText("S", {
-        x: 639,
-        y: 86,
-        size: 10,
-        font: boldFont,
-        color: purple,
-    });
+    <filter id="shadow">
+        <feDropShadow
+            dx="0"
+            dy="10"
+            stdDeviation="15"
+            flood-opacity="0.18"
+        />
+    </filter>
 
-    page.drawText(
-        "Keep this ticket safe",
-        {
-            x: 675,
-            y: 97,
-            size: 9,
-            font: boldFont,
-            color: darkGray,
-        }
-    );
+</defs>
 
-    page.drawText(
-        "and do not share it.",
-        {
-            x: 675,
-            y: 81,
-            size: 9,
-            font: regularFont,
-            color: gray,
-        }
-    );
+<!-- MAIN CARD -->
 
-    // =========================================================
-    // SAVE
-    // =========================================================
+<rect
+    x="20"
+    y="20"
+    width="971"
+    height="1614"
+    rx="42"
+    fill="white"
+    filter="url(#shadow)"
+/>
 
-    const pdfBytes = await pdfDoc.save();
+<!-- HEADER -->
 
-    return Buffer.from(pdfBytes);
-};
+<path
+    d="M20 62 Q20 20 62 20 H949 Q991 20 991 62 V820 H20 Z"
+    fill="url(#background)"
+/>
 
+<!-- Decorative dots -->
 
-// =============================================================
-// DATE FORMATTER
-// =============================================================
+<g opacity="0.25" fill="#FFFFFF">
+    <circle cx="880" cy="85" r="6"/>
+    <circle cx="910" cy="115" r="5"/>
+    <circle cx="940" cy="85" r="4"/>
+    <circle cx="850" cy="115" r="4"/>
+</g>
 
-function formatDate(dateString) {
-    if (!dateString) return "";
+<!-- LOGO -->
 
-    const date = new Date(dateString);
+<circle
+    cx="100"
+    cy="110"
+    r="43"
+    fill="#6125E8"
+/>
 
-    if (Number.isNaN(date.getTime())) {
-        return String(dateString);
-    }
+<text
+    x="100"
+    y="125"
+    text-anchor="middle"
+    font-family="Arial, Helvetica, sans-serif"
+    font-size="42"
+    font-weight="700"
+    fill="white"
+>
+    E
+</text>
 
-    return date
-        .toLocaleDateString("en-GB", {
-            day: "2-digit",
-            month: "short",
-            year: "numeric",
+<text
+    x="165"
+    y="112"
+    font-family="Arial, Helvetica, sans-serif"
+    font-size="40"
+    font-weight="700"
+    fill="white"
+>
+    EVENTORA
+</text>
+
+<text
+    x="168"
+    y="142"
+    font-family="Arial, Helvetica, sans-serif"
+    font-size="17"
+    fill="#D8D3F7"
+>
+    Your Event, Your Experience
+</text>
+
+<!-- CONFIRMED -->
+
+<rect
+    x="700"
+    y="82"
+    width="225"
+    height="58"
+    rx="15"
+    fill="#00C96B"
+/>
+
+<circle cx="730" cy="111" r="13" fill="none" stroke="white" stroke-width="3"/>
+
+<path
+    d="M723 111 L728 116 L738 105"
+    fill="none"
+    stroke="white"
+    stroke-width="3"
+/>
+
+<text
+    x="750"
+    y="119"
+    font-family="Arial, Helvetica, sans-serif"
+    font-size="21"
+    font-weight="700"
+    fill="white"
+>
+    CONFIRMED
+</text>
+
+<!-- EVENT LABEL -->
+
+<rect
+    x="65"
+    y="205"
+    width="120"
+    height="45"
+    rx="10"
+    fill="#6524E8"
+/>
+
+<text
+    x="125"
+    y="235"
+    text-anchor="middle"
+    font-family="Arial, Helvetica, sans-serif"
+    font-size="18"
+    font-weight="700"
+    fill="white"
+>
+    EVENT
+</text>
+
+<!-- EVENT TITLE -->
+
+<text
+    x="65"
+    y="300"
+    font-family="Arial, Helvetica, sans-serif"
+    font-size="40"
+    font-weight="700"
+    fill="white"
+>
+    ${title}
+</text>
+
+<!-- EVENT IMAGE -->
+
+${image}
+
+<!-- WAVE -->
+
+<path
+    d="M20 700
+       C180 760 300 790 450 745
+       C620 690 760 760 991 700
+       L991 850
+       L20 850 Z"
+    fill="url(#background)"
+/>
+
+<path
+    d="M20 705
+       C190 770 310 795 470 745
+       C630 695 770 765 991 705"
+    fill="none"
+    stroke="url(#wave)"
+    stroke-width="18"
+/>
+
+<!-- DATE -->
+
+<text
+    x="75"
+    y="825"
+    font-family="Arial, Helvetica, sans-serif"
+    font-size="17"
+    font-weight="700"
+    fill="#C9A9FF"
+>
+    DATE
+</text>
+
+<text
+    x="75"
+    y="860"
+    font-family="Arial, Helvetica, sans-serif"
+    font-size="24"
+    font-weight="700"
+    fill="white"
+>
+    ${date}
+</text>
+
+<!-- LOCATION -->
+
+<text
+    x="545"
+    y="825"
+    font-family="Arial, Helvetica, sans-serif"
+    font-size="17"
+    font-weight="700"
+    fill="#C9A9FF"
+>
+    LOCATION
+</text>
+
+<text
+    x="545"
+    y="860"
+    font-family="Arial, Helvetica, sans-serif"
+    font-size="22"
+    font-weight="700"
+    fill="white"
+>
+    ${location}
+</text>
+
+<!-- TICKET DETAILS -->
+
+<rect
+    x="20"
+    y="895"
+    width="971"
+    height="570"
+    rx="40"
+    fill="white"
+/>
+
+<text
+    x="65"
+    y="955"
+    font-family="Arial, Helvetica, sans-serif"
+    font-size="25"
+    font-weight="700"
+    fill="#5423D9"
+>
+    TICKET DETAILS
+</text>
+
+<line
+    x1="65"
+    y1="975"
+    x2="946"
+    y2="975"
+    stroke="#E5DDFB"
+    stroke-width="3"
+/>
+
+<!-- DETAIL CARD -->
+
+<rect
+    x="55"
+    y="1005"
+    width="901"
+    height="390"
+    rx="25"
+    fill="#FAF9FF"
+    stroke="#E6DFFC"
+    stroke-width="2"
+/>
+
+<!-- Attendee -->
+
+<circle cx="100" cy="1060" r="28" fill="#5C20E8"/>
+
+<text
+    x="100"
+    y="1069"
+    text-anchor="middle"
+    font-family="Arial, Helvetica, sans-serif"
+    font-size="20"
+    font-weight="700"
+    fill="white"
+>
+    U
+</text>
+
+<text x="145" y="1052"
+    font-family="Arial, Helvetica, sans-serif"
+    font-size="14"
+    font-weight="700"
+    fill="#777">
+    ATTENDEE
+</text>
+
+<text x="145" y="1078"
+    font-family="Arial, Helvetica, sans-serif"
+    font-size="21"
+    font-weight="700"
+    fill="#17152D">
+    ${attendee}
+</text>
+
+<!-- Date -->
+
+<circle cx="100" cy="1140" r="28" fill="#EC249F"/>
+
+<text
+    x="145"
+    y="1132"
+    font-family="Arial, Helvetica, sans-serif"
+    font-size="14"
+    font-weight="700"
+    fill="#777">
+    DATE
+</text>
+
+<text
+    x="145"
+    y="1158"
+    font-family="Arial, Helvetica, sans-serif"
+    font-size="21"
+    font-weight="700"
+    fill="#17152D">
+    ${date}
+</text>
+
+<!-- Location -->
+
+<circle cx="100" cy="1220" r="28" fill="#FF921D"/>
+
+<text
+    x="145"
+    y="1212"
+    font-family="Arial, Helvetica, sans-serif"
+    font-size="14"
+    font-weight="700"
+    fill="#777">
+    LOCATION
+</text>
+
+<text
+    x="145"
+    y="1238"
+    font-family="Arial, Helvetica, sans-serif"
+    font-size="20"
+    font-weight="700"
+    fill="#17152D">
+    ${location}
+</text>
+
+<!-- Category -->
+
+<circle cx="100" cy="1300" r="28" fill="#08B96B"/>
+
+<text
+    x="145"
+    y="1292"
+    font-family="Arial, Helvetica, sans-serif"
+    font-size="14"
+    font-weight="700"
+    fill="#777">
+    CATEGORY
+</text>
+
+<text
+    x="145"
+    y="1318"
+    font-family="Arial, Helvetica, sans-serif"
+    font-size="21"
+    font-weight="700"
+    fill="#17152D">
+    ${category}
+</text>
+
+<!-- Price -->
+
+<circle cx="100" cy="1370" r="28" fill="#2469F5"/>
+
+<text
+    x="145"
+    y="1362"
+    font-family="Arial, Helvetica, sans-serif"
+    font-size="14"
+    font-weight="700"
+    fill="#777">
+    TICKET PRICE
+</text>
+
+<text
+    x="145"
+    y="1388"
+    font-family="Arial, Helvetica, sans-serif"
+    font-size="21"
+    font-weight="700"
+    fill="#17152D">
+    ${price}
+</text>
+
+<!-- EMAIL -->
+
+<text
+    x="600"
+    y="1052"
+    font-family="Arial, Helvetica, sans-serif"
+    font-size="14"
+    font-weight="700"
+    fill="#777">
+    EMAIL
+</text>
+
+<text
+    x="600"
+    y="1080"
+    font-family="Arial, Helvetica, sans-serif"
+    font-size="17"
+    font-weight="700"
+    fill="#17152D">
+    ${email}
+</text>
+
+<!-- INFO -->
+
+<rect
+    x="55"
+    y="1420"
+    width="901"
+    height="110"
+    rx="22"
+    fill="#F0E9FF"
+    stroke="#D2C0FF"
+    stroke-width="2"
+/>
+
+<circle
+    cx="100"
+    cy="1475"
+    r="24"
+    fill="#5A20D9"
+/>
+
+<text
+    x="100"
+    y="1484"
+    text-anchor="middle"
+    font-family="Arial, Helvetica, sans-serif"
+    font-size="22"
+    font-weight="700"
+    fill="white">
+    i
+</text>
+
+<text
+    x="140"
+    y="1465"
+    font-family="Arial, Helvetica, sans-serif"
+    font-size="16"
+    fill="#26233A">
+    This ticket is valid only for the
+</text>
+
+<text
+    x="140"
+    y="1492"
+    font-family="Arial, Helvetica, sans-serif"
+    font-size="16"
+    fill="#26233A">
+    event mentioned above.
+</text>
+
+<text
+    x="140"
+    y="1520"
+    font-family="Arial, Helvetica, sans-serif"
+    font-size="17"
+    font-weight="700"
+    fill="#5522DA">
+    Thank you for choosing Eventora.
+</text>
+
+<!-- FOOTER -->
+
+<rect
+    x="20"
+    y="1535"
+    width="971"
+    height="99"
+    rx="0 0 42 42"
+    fill="url(#bottomGradient)"
+/>
+
+<text
+    x="65"
+    y="1595"
+    font-family="Arial, Helvetica, sans-serif"
+    font-size="19"
+    font-weight="700"
+    fill="white">
+    TICKET ID:
+</text>
+
+<text
+    x="190"
+    y="1595"
+    font-family="Arial, Helvetica, sans-serif"
+    font-size="19"
+    font-weight="700"
+    fill="#FFE600">
+    ${bookingId}
+</text>
+
+</svg>
+`;
+
+    const pngBuffer = await sharp(Buffer.from(svg))
+        .png({
+            quality: 100,
+            compressionLevel: 9,
         })
-        .toUpperCase();
-}
+        .toBuffer();
+
+    return pngBuffer;
+};

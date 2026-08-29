@@ -2,7 +2,7 @@ import Booking from '../models/Booking.models.js';
 import Event from '../models/Event.models.js';
 import Otp from '../models/OTP.models.js';
 import { sendBookingEmail, sendOTPEmail } from '../utils/email.js';
-import { generateTicketPDF } from "../utils/generateTicket.js";
+import { generateTicketPNG } from "../utils/generateTicket.js";
 
 const generateOTP = () => Math.floor(100000 + Math.random() * 900000).toString();
 
@@ -99,8 +99,8 @@ export const confirmBooking = async (req, res) => {
         event.availableSeats -= 1;
         await event.save();
 
-        // Generate PDF ticket
-        const ticketBuffer = await generateTicketPDF(booking);
+        // Generate PNG ticket
+        const ticketBuffer = await generateTicketPNG(booking);
 
         // Send ticket through email
         await sendBookingEmail(
