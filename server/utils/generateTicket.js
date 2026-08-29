@@ -123,7 +123,7 @@ export const generateTicketPDF = async (booking) => {
         color: green,
     });
 
-    page.drawText("✓ CONFIRMED", {
+    page.drawText(" CONFIRMED", {
         x: 464,
         y: height - 75,
         size: 10,
