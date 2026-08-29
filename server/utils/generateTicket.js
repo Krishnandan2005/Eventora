@@ -4,6 +4,10 @@ import sharp from "sharp";
 const WIDTH = 1011;
 const HEIGHT = 1654;
 
+// IMPORTANT:
+// Use a Linux-safe font on Vercel.
+const FONT = "DejaVu Sans";
+
 const escapeXml = (value = "") =>
     String(value)
         .replace(/&/g, "&amp;")
@@ -17,21 +21,32 @@ const formatDate = (date) => {
 
     const d = new Date(date);
 
-    if (isNaN(d.getTime())) return String(date);
+    if (isNaN(d.getTime())) {
+        return String(date);
+    }
 
-    return d.toLocaleDateString("en-GB", {
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
-    }).toUpperCase();
+    return d
+        .toLocaleDateString("en-GB", {
+            day: "2-digit",
+            month: "short",
+            year: "numeric",
+        })
+        .toUpperCase();
 };
 
+// ==========================================
+// FETCH EVENT IMAGE
+// ==========================================
 const fetchImageAsDataUri = async (url) => {
     try {
+        if (!url) return null;
+
         const response = await fetch(url);
 
         if (!response.ok) {
-            throw new Error(`Image fetch failed: ${response.status}`);
+            throw new Error(
+                `Image fetch failed: ${response.status}`
+            );
         }
 
         const arrayBuffer = await response.arrayBuffer();
@@ -41,8 +56,13 @@ const fetchImageAsDataUri = async (url) => {
 
         let mime = "image/jpeg";
 
-        if (metadata.format === "png") mime = "image/png";
-        if (metadata.format === "webp") mime = "image/webp";
+        if (metadata.format === "png") {
+            mime = "image/png";
+        }
+
+        if (metadata.format === "webp") {
+            mime = "image/webp";
+        }
 
         return `data:${mime};base64,${buffer.toString("base64")}`;
     } catch (error) {
@@ -51,12 +71,21 @@ const fetchImageAsDataUri = async (url) => {
     }
 };
 
+// ==========================================
+// GENERATE TICKET PNG
+// ==========================================
 export const generateTicketPNG = async (booking) => {
     const event = booking.eventId;
     const user = booking.userId;
 
-    const eventImage = await fetchImageAsDataUri(event.imageUrl);
+    // Get event image
+    const eventImage = await fetchImageAsDataUri(
+        event.imageUrl
+    );
 
+    // ==========================================
+    // QR CODE
+    // ==========================================
     const qrData = JSON.stringify({
         bookingId: booking._id.toString(),
         eventId: event._id.toString(),
@@ -68,6 +97,9 @@ export const generateTicketPNG = async (booking) => {
         errorCorrectionLevel: "H",
     });
 
+    // ==========================================
+    // DYNAMIC DATA
+    // ==========================================
     const title = escapeXml(event.title);
     const attendee = escapeXml(user.name);
     const email = escapeXml(user.email);
@@ -75,48 +107,64 @@ export const generateTicketPNG = async (booking) => {
     const location = escapeXml(event.location);
     const category = escapeXml(event.category);
     const price = escapeXml(`INR ${booking.amount}`);
+
     const bookingId = escapeXml(
-        booking._id.toString().slice(-16).toUpperCase()
+        booking._id
+            .toString()
+            .slice(-16)
+            .toUpperCase()
     );
 
+    // ==========================================
+    // EVENT IMAGE
+    // ==========================================
     const image = eventImage
         ? `
-        <defs>
-            <clipPath id="eventImageClip">
-                <rect x="45" y="330" width="921" height="430" rx="30"/>
-            </clipPath>
-        </defs>
+            <defs>
+                <clipPath id="eventImageClip">
+                    <rect
+                        x="45"
+                        y="330"
+                        width="921"
+                        height="430"
+                        rx="30"
+                    />
+                </clipPath>
+            </defs>
 
-        <image
-            href="${eventImage}"
-            x="45"
-            y="330"
-            width="921"
-            height="430"
-            preserveAspectRatio="xMidYMid slice"
-            clip-path="url(#eventImageClip)"
-        />
+            <image
+                href="${eventImage}"
+                x="45"
+                y="330"
+                width="921"
+                height="430"
+                preserveAspectRatio="xMidYMid slice"
+                clip-path="url(#eventImageClip)"
+            />
 
-        <rect
-            x="45"
-            y="330"
-            width="921"
-            height="430"
-            rx="30"
-            fill="url(#imageOverlay)"
-        />
+            <rect
+                x="45"
+                y="330"
+                width="921"
+                height="430"
+                rx="30"
+                fill="url(#imageOverlay)"
+            />
         `
         : `
-        <rect
-            x="45"
-            y="330"
-            width="921"
-            height="430"
-            rx="30"
-            fill="#24105f"
-        />
+            <rect
+                x="45"
+                y="330"
+                width="921"
+                height="430"
+                rx="30"
+                fill="#24105f"
+            />
         `;
 
+    // ==========================================
+    // SVG
+    // ==========================================
     const svg = `
 <svg
     width="${WIDTH}"
@@ -127,29 +175,100 @@ export const generateTicketPNG = async (booking) => {
 
 <defs>
 
-    <linearGradient id="background" x1="0" y1="0" x2="1" y2="1">
-        <stop offset="0%" stop-color="#08052D"/>
-        <stop offset="55%" stop-color="#30108F"/>
-        <stop offset="100%" stop-color="#7B16D9"/>
+    <!-- Main background -->
+    <linearGradient
+        id="background"
+        x1="0"
+        y1="0"
+        x2="1"
+        y2="1"
+    >
+        <stop
+            offset="0%"
+            stop-color="#08052D"
+        />
+
+        <stop
+            offset="55%"
+            stop-color="#30108F"
+        />
+
+        <stop
+            offset="100%"
+            stop-color="#7B16D9"
+        />
     </linearGradient>
 
-    <linearGradient id="bottomGradient" x1="0" y1="0" x2="1" y2="0">
-        <stop offset="0%" stop-color="#3920E8"/>
-        <stop offset="50%" stop-color="#7B20F2"/>
-        <stop offset="100%" stop-color="#F026A8"/>
+    <!-- Footer -->
+    <linearGradient
+        id="bottomGradient"
+        x1="0"
+        y1="0"
+        x2="1"
+        y2="0"
+    >
+        <stop
+            offset="0%"
+            stop-color="#3920E8"
+        />
+
+        <stop
+            offset="50%"
+            stop-color="#7B20F2"
+        />
+
+        <stop
+            offset="100%"
+            stop-color="#F026A8"
+        />
     </linearGradient>
 
-    <linearGradient id="imageOverlay" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%" stop-color="#05052D" stop-opacity="0.15"/>
-        <stop offset="100%" stop-color="#05052D" stop-opacity="0.65"/>
+    <!-- Image overlay -->
+    <linearGradient
+        id="imageOverlay"
+        x1="0"
+        y1="0"
+        x2="0"
+        y2="1"
+    >
+        <stop
+            offset="0%"
+            stop-color="#05052D"
+            stop-opacity="0.10"
+        />
+
+        <stop
+            offset="100%"
+            stop-color="#05052D"
+            stop-opacity="0.70"
+        />
     </linearGradient>
 
-    <linearGradient id="wave" x1="0" y1="0" x2="1" y2="0">
-        <stop offset="0%" stop-color="#F52BA7"/>
-        <stop offset="50%" stop-color="#A52AF4"/>
-        <stop offset="100%" stop-color="#FF9E20"/>
+    <!-- Wave -->
+    <linearGradient
+        id="wave"
+        x1="0"
+        y1="0"
+        x2="1"
+        y2="0"
+    >
+        <stop
+            offset="0%"
+            stop-color="#F52BA7"
+        />
+
+        <stop
+            offset="50%"
+            stop-color="#A52AF4"
+        />
+
+        <stop
+            offset="100%"
+            stop-color="#FF9E20"
+        />
     </linearGradient>
 
+    <!-- Shadow -->
     <filter id="shadow">
         <feDropShadow
             dx="0"
@@ -161,7 +280,9 @@ export const generateTicketPNG = async (booking) => {
 
 </defs>
 
+<!-- ===================================== -->
 <!-- MAIN CARD -->
+<!-- ===================================== -->
 
 <rect
     x="20"
@@ -173,23 +294,57 @@ export const generateTicketPNG = async (booking) => {
     filter="url(#shadow)"
 />
 
+<!-- ===================================== -->
 <!-- HEADER -->
+<!-- ===================================== -->
 
 <path
-    d="M20 62 Q20 20 62 20 H949 Q991 20 991 62 V820 H20 Z"
+    d="
+        M20 62
+        Q20 20 62 20
+        H949
+        Q991 20 991 62
+        V820
+        H20
+        Z
+    "
     fill="url(#background)"
 />
 
 <!-- Decorative dots -->
 
-<g opacity="0.25" fill="#FFFFFF">
-    <circle cx="880" cy="85" r="6"/>
-    <circle cx="910" cy="115" r="5"/>
-    <circle cx="940" cy="85" r="4"/>
-    <circle cx="850" cy="115" r="4"/>
+<g
+    opacity="0.25"
+    fill="#FFFFFF"
+>
+    <circle
+        cx="880"
+        cy="85"
+        r="6"
+    />
+
+    <circle
+        cx="910"
+        cy="115"
+        r="5"
+    />
+
+    <circle
+        cx="940"
+        cy="85"
+        r="4"
+    />
+
+    <circle
+        cx="850"
+        cy="115"
+        r="4"
+    />
 </g>
 
+<!-- ===================================== -->
 <!-- LOGO -->
+<!-- ===================================== -->
 
 <circle
     cx="100"
@@ -202,7 +357,7 @@ export const generateTicketPNG = async (booking) => {
     x="100"
     y="125"
     text-anchor="middle"
-    font-family="Arial, Helvetica, sans-serif"
+    font-family="${FONT}"
     font-size="42"
     font-weight="700"
     fill="white"
@@ -213,7 +368,7 @@ export const generateTicketPNG = async (booking) => {
 <text
     x="165"
     y="112"
-    font-family="Arial, Helvetica, sans-serif"
+    font-family="${FONT}"
     font-size="40"
     font-weight="700"
     fill="white"
@@ -224,14 +379,16 @@ export const generateTicketPNG = async (booking) => {
 <text
     x="168"
     y="142"
-    font-family="Arial, Helvetica, sans-serif"
+    font-family="${FONT}"
     font-size="17"
     fill="#D8D3F7"
 >
     Your Event, Your Experience
 </text>
 
+<!-- ===================================== -->
 <!-- CONFIRMED -->
+<!-- ===================================== -->
 
 <rect
     x="700"
@@ -242,7 +399,14 @@ export const generateTicketPNG = async (booking) => {
     fill="#00C96B"
 />
 
-<circle cx="730" cy="111" r="13" fill="none" stroke="white" stroke-width="3"/>
+<circle
+    cx="730"
+    cy="111"
+    r="13"
+    fill="none"
+    stroke="white"
+    stroke-width="3"
+/>
 
 <path
     d="M723 111 L728 116 L738 105"
@@ -254,7 +418,7 @@ export const generateTicketPNG = async (booking) => {
 <text
     x="750"
     y="119"
-    font-family="Arial, Helvetica, sans-serif"
+    font-family="${FONT}"
     font-size="21"
     font-weight="700"
     fill="white"
@@ -262,7 +426,9 @@ export const generateTicketPNG = async (booking) => {
     CONFIRMED
 </text>
 
+<!-- ===================================== -->
 <!-- EVENT LABEL -->
+<!-- ===================================== -->
 
 <rect
     x="65"
@@ -277,7 +443,7 @@ export const generateTicketPNG = async (booking) => {
     x="125"
     y="235"
     text-anchor="middle"
-    font-family="Arial, Helvetica, sans-serif"
+    font-family="${FONT}"
     font-size="18"
     font-weight="700"
     fill="white"
@@ -285,12 +451,14 @@ export const generateTicketPNG = async (booking) => {
     EVENT
 </text>
 
+<!-- ===================================== -->
 <!-- EVENT TITLE -->
+<!-- ===================================== -->
 
 <text
     x="65"
     y="300"
-    font-family="Arial, Helvetica, sans-serif"
+    font-family="${FONT}"
     font-size="40"
     font-weight="700"
     fill="white"
@@ -298,36 +466,47 @@ export const generateTicketPNG = async (booking) => {
     ${title}
 </text>
 
+<!-- ===================================== -->
 <!-- EVENT IMAGE -->
+<!-- ===================================== -->
 
 ${image}
 
+<!-- ===================================== -->
 <!-- WAVE -->
+<!-- ===================================== -->
 
 <path
-    d="M20 700
-       C180 760 300 790 450 745
-       C620 690 760 760 991 700
-       L991 850
-       L20 850 Z"
+    d="
+        M20 700
+        C180 760 300 790 450 745
+        C620 690 760 760 991 700
+        L991 850
+        L20 850
+        Z
+    "
     fill="url(#background)"
 />
 
 <path
-    d="M20 705
-       C190 770 310 795 470 745
-       C630 695 770 765 991 705"
+    d="
+        M20 705
+        C190 770 310 795 470 745
+        C630 695 770 765 991 705
+    "
     fill="none"
     stroke="url(#wave)"
     stroke-width="18"
 />
 
+<!-- ===================================== -->
 <!-- DATE -->
+<!-- ===================================== -->
 
 <text
     x="75"
     y="825"
-    font-family="Arial, Helvetica, sans-serif"
+    font-family="${FONT}"
     font-size="17"
     font-weight="700"
     fill="#C9A9FF"
@@ -338,7 +517,7 @@ ${image}
 <text
     x="75"
     y="860"
-    font-family="Arial, Helvetica, sans-serif"
+    font-family="${FONT}"
     font-size="24"
     font-weight="700"
     fill="white"
@@ -346,12 +525,14 @@ ${image}
     ${date}
 </text>
 
+<!-- ===================================== -->
 <!-- LOCATION -->
+<!-- ===================================== -->
 
 <text
     x="545"
     y="825"
-    font-family="Arial, Helvetica, sans-serif"
+    font-family="${FONT}"
     font-size="17"
     font-weight="700"
     fill="#C9A9FF"
@@ -362,7 +543,7 @@ ${image}
 <text
     x="545"
     y="860"
-    font-family="Arial, Helvetica, sans-serif"
+    font-family="${FONT}"
     font-size="22"
     font-weight="700"
     fill="white"
@@ -370,7 +551,9 @@ ${image}
     ${location}
 </text>
 
+<!-- ===================================== -->
 <!-- TICKET DETAILS -->
+<!-- ===================================== -->
 
 <rect
     x="20"
@@ -384,7 +567,7 @@ ${image}
 <text
     x="65"
     y="955"
-    font-family="Arial, Helvetica, sans-serif"
+    font-family="${FONT}"
     font-size="25"
     font-weight="700"
     fill="#5423D9"
@@ -401,7 +584,9 @@ ${image}
     stroke-width="3"
 />
 
+<!-- ===================================== -->
 <!-- DETAIL CARD -->
+<!-- ===================================== -->
 
 <rect
     x="55"
@@ -414,15 +599,20 @@ ${image}
     stroke-width="2"
 />
 
-<!-- Attendee -->
+<!-- ATTENDEE -->
 
-<circle cx="100" cy="1060" r="28" fill="#5C20E8"/>
+<circle
+    cx="100"
+    cy="1060"
+    r="28"
+    fill="#5C20E8"
+/>
 
 <text
     x="100"
     y="1069"
     text-anchor="middle"
-    font-family="Arial, Helvetica, sans-serif"
+    font-family="${FONT}"
     font-size="20"
     font-weight="700"
     fill="white"
@@ -430,115 +620,149 @@ ${image}
     U
 </text>
 
-<text x="145" y="1052"
-    font-family="Arial, Helvetica, sans-serif"
+<text
+    x="145"
+    y="1052"
+    font-family="${FONT}"
     font-size="14"
     font-weight="700"
-    fill="#777">
+    fill="#777"
+>
     ATTENDEE
 </text>
 
-<text x="145" y="1078"
-    font-family="Arial, Helvetica, sans-serif"
+<text
+    x="145"
+    y="1078"
+    font-family="${FONT}"
     font-size="21"
     font-weight="700"
-    fill="#17152D">
+    fill="#17152D"
+>
     ${attendee}
 </text>
 
-<!-- Date -->
+<!-- DATE -->
 
-<circle cx="100" cy="1140" r="28" fill="#EC249F"/>
+<circle
+    cx="100"
+    cy="1140"
+    r="28"
+    fill="#EC249F"
+/>
 
 <text
     x="145"
     y="1132"
-    font-family="Arial, Helvetica, sans-serif"
+    font-family="${FONT}"
     font-size="14"
     font-weight="700"
-    fill="#777">
+    fill="#777"
+>
     DATE
 </text>
 
 <text
     x="145"
     y="1158"
-    font-family="Arial, Helvetica, sans-serif"
+    font-family="${FONT}"
     font-size="21"
     font-weight="700"
-    fill="#17152D">
+    fill="#17152D"
+>
     ${date}
 </text>
 
-<!-- Location -->
+<!-- LOCATION -->
 
-<circle cx="100" cy="1220" r="28" fill="#FF921D"/>
+<circle
+    cx="100"
+    cy="1220"
+    r="28"
+    fill="#FF921D"
+/>
 
 <text
     x="145"
     y="1212"
-    font-family="Arial, Helvetica, sans-serif"
+    font-family="${FONT}"
     font-size="14"
     font-weight="700"
-    fill="#777">
+    fill="#777"
+>
     LOCATION
 </text>
 
 <text
     x="145"
     y="1238"
-    font-family="Arial, Helvetica, sans-serif"
+    font-family="${FONT}"
     font-size="20"
     font-weight="700"
-    fill="#17152D">
+    fill="#17152D"
+>
     ${location}
 </text>
 
-<!-- Category -->
+<!-- CATEGORY -->
 
-<circle cx="100" cy="1300" r="28" fill="#08B96B"/>
+<circle
+    cx="100"
+    cy="1300"
+    r="28"
+    fill="#08B96B"
+/>
 
 <text
     x="145"
     y="1292"
-    font-family="Arial, Helvetica, sans-serif"
+    font-family="${FONT}"
     font-size="14"
     font-weight="700"
-    fill="#777">
+    fill="#777"
+>
     CATEGORY
 </text>
 
 <text
     x="145"
     y="1318"
-    font-family="Arial, Helvetica, sans-serif"
+    font-family="${FONT}"
     font-size="21"
     font-weight="700"
-    fill="#17152D">
+    fill="#17152D"
+>
     ${category}
 </text>
 
-<!-- Price -->
+<!-- PRICE -->
 
-<circle cx="100" cy="1370" r="28" fill="#2469F5"/>
+<circle
+    cx="100"
+    cy="1370"
+    r="28"
+    fill="#2469F5"
+/>
 
 <text
     x="145"
     y="1362"
-    font-family="Arial, Helvetica, sans-serif"
+    font-family="${FONT}"
     font-size="14"
     font-weight="700"
-    fill="#777">
+    fill="#777"
+>
     TICKET PRICE
 </text>
 
 <text
     x="145"
     y="1388"
-    font-family="Arial, Helvetica, sans-serif"
+    font-family="${FONT}"
     font-size="21"
     font-weight="700"
-    fill="#17152D">
+    fill="#17152D"
+>
     ${price}
 </text>
 
@@ -547,24 +771,28 @@ ${image}
 <text
     x="600"
     y="1052"
-    font-family="Arial, Helvetica, sans-serif"
+    font-family="${FONT}"
     font-size="14"
     font-weight="700"
-    fill="#777">
+    fill="#777"
+>
     EMAIL
 </text>
 
 <text
     x="600"
     y="1080"
-    font-family="Arial, Helvetica, sans-serif"
+    font-family="${FONT}"
     font-size="17"
     font-weight="700"
-    fill="#17152D">
+    fill="#17152D"
+>
     ${email}
 </text>
 
+<!-- ===================================== -->
 <!-- INFO -->
+<!-- ===================================== -->
 
 <rect
     x="55"
@@ -588,76 +816,88 @@ ${image}
     x="100"
     y="1484"
     text-anchor="middle"
-    font-family="Arial, Helvetica, sans-serif"
+    font-family="${FONT}"
     font-size="22"
     font-weight="700"
-    fill="white">
+    fill="white"
+>
     i
 </text>
 
 <text
     x="140"
     y="1465"
-    font-family="Arial, Helvetica, sans-serif"
+    font-family="${FONT}"
     font-size="16"
-    fill="#26233A">
+    fill="#26233A"
+>
     This ticket is valid only for the
 </text>
 
 <text
     x="140"
     y="1492"
-    font-family="Arial, Helvetica, sans-serif"
+    font-family="${FONT}"
     font-size="16"
-    fill="#26233A">
+    fill="#26233A"
+>
     event mentioned above.
 </text>
 
 <text
     x="140"
     y="1520"
-    font-family="Arial, Helvetica, sans-serif"
+    font-family="${FONT}"
     font-size="17"
     font-weight="700"
-    fill="#5522DA">
+    fill="#5522DA"
+>
     Thank you for choosing Eventora.
 </text>
 
+<!-- ===================================== -->
 <!-- FOOTER -->
+<!-- ===================================== -->
 
 <rect
     x="20"
     y="1535"
     width="971"
     height="99"
-    rx="0 0 42 42"
     fill="url(#bottomGradient)"
 />
 
 <text
     x="65"
     y="1595"
-    font-family="Arial, Helvetica, sans-serif"
+    font-family="${FONT}"
     font-size="19"
     font-weight="700"
-    fill="white">
+    fill="white"
+>
     TICKET ID:
 </text>
 
 <text
     x="190"
     y="1595"
-    font-family="Arial, Helvetica, sans-serif"
+    font-family="${FONT}"
     font-size="19"
     font-weight="700"
-    fill="#FFE600">
+    fill="#FFE600"
+>
     ${bookingId}
 </text>
 
 </svg>
 `;
 
-    const pngBuffer = await sharp(Buffer.from(svg))
+    // ==========================================
+    // SVG → PNG
+    // ==========================================
+    const pngBuffer = await sharp(
+        Buffer.from(svg)
+    )
         .png({
             quality: 100,
             compressionLevel: 9,
