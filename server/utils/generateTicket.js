@@ -8,42 +8,62 @@ export const generateTicketPDF = async (booking) => {
     const page = pdfDoc.addPage([842, 595]);
     const { width, height } = page.getSize();
 
-    // Fonts
-    const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-    const regularFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
+    // =========================================================
+    // FONTS
+    // =========================================================
 
-    // Colors
-    const navy = rgb(0.03, 0.05, 0.15);
-    const blue = rgb(0.18, 0.30, 0.95);
-    const green = rgb(0.05, 0.60, 0.30);
-    const darkText = rgb(0.08, 0.10, 0.18);
-    const grayText = rgb(0.40, 0.42, 0.48);
-    const lightBg = rgb(0.95, 0.96, 1);
-    const white = rgb(1, 1, 1);
+    const regularFont = await pdfDoc.embedFont(
+        StandardFonts.Helvetica
+    );
+
+    const boldFont = await pdfDoc.embedFont(
+        StandardFonts.HelveticaBold
+    );
 
     // =========================================================
-    // OUTER TICKET
+    // COLORS
+    // =========================================================
+
+    const navy = rgb(0.025, 0.035, 0.13);
+    const deepPurple = rgb(0.24, 0.08, 0.65);
+    const purple = rgb(0.38, 0.18, 0.95);
+    const lightPurple = rgb(0.95, 0.93, 1);
+    const white = rgb(1, 1, 1);
+    const black = rgb(0.04, 0.05, 0.10);
+    const darkGray = rgb(0.25, 0.27, 0.34);
+    const gray = rgb(0.50, 0.52, 0.58);
+    const borderGray = rgb(0.86, 0.86, 0.90);
+    const green = rgb(0.02, 0.62, 0.34);
+
+    // =========================================================
+    // OUTER BORDER
     // =========================================================
 
     page.drawRectangle({
-        x: 20,
-        y: 20,
-        width: width - 40,
-        height: height - 40,
+        x: 15,
+        y: 15,
+        width: width - 30,
+        height: height - 30,
         color: white,
         borderColor: navy,
         borderWidth: 2,
     });
 
     // =========================================================
-    // LEFT SIDE HEADER
+    // LEFT CONTENT WIDTH
+    // =========================================================
+
+    const leftWidth = 555;
+
+    // =========================================================
+    // HEADER / EVENT IMAGE AREA
     // =========================================================
 
     page.drawRectangle({
-        x: 22,
+        x: 17,
         y: height - 255,
-        width: 550,
-        height: 233,
+        width: leftWidth,
+        height: 238,
         color: navy,
     });
 
@@ -52,116 +72,200 @@ export const generateTicketPDF = async (booking) => {
     // =========================================================
 
     try {
-        if (booking.eventId.imageUrl) {
-            const response = await fetch(booking.eventId.imageUrl);
+        const imageUrl = booking.eventId.imageUrl;
 
-            if (response.ok) {
-                const imageBytes = await response.arrayBuffer();
-                const contentType =
-                    response.headers.get("content-type") || "";
+        if (imageUrl) {
+            const response = await fetch(imageUrl);
 
-                let eventImage;
-
-                if (contentType.includes("png")) {
-                    eventImage = await pdfDoc.embedPng(imageBytes);
-                } else {
-                    eventImage = await pdfDoc.embedJpg(imageBytes);
-                }
-
-                page.drawImage(eventImage, {
-                    x: 280,
-                    y: height - 255,
-                    width: 292,
-                    height: 233,
-                    opacity: 0.75,
-                });
+            if (!response.ok) {
+                throw new Error(
+                    `Image request failed: ${response.status}`
+                );
             }
+
+            const imageBuffer = await response.arrayBuffer();
+
+            const contentType =
+                response.headers.get("content-type") || "";
+
+            let eventImage;
+
+            if (contentType.includes("png")) {
+                eventImage = await pdfDoc.embedPng(imageBuffer);
+            } else if (
+                contentType.includes("jpeg") ||
+                contentType.includes("jpg")
+            ) {
+                eventImage = await pdfDoc.embedJpg(imageBuffer);
+            } else {
+                throw new Error(
+                    `Unsupported image type: ${contentType}`
+                );
+            }
+
+            // Image area
+            const imageX = 270;
+            const imageY = height - 255;
+            const imageWidth = 300;
+            const imageHeight = 238;
+
+            // Fit image while preserving aspect ratio
+            const imageDims = eventImage.scale(1);
+
+            const imageScale = Math.max(
+                imageWidth / imageDims.width,
+                imageHeight / imageDims.height
+            );
+
+            const scaledWidth =
+                imageDims.width * imageScale;
+
+            const scaledHeight =
+                imageDims.height * imageScale;
+
+            const imageDrawX =
+                imageX +
+                (imageWidth - scaledWidth) / 2;
+
+            const imageDrawY =
+                imageY +
+                (imageHeight - scaledHeight) / 2;
+
+            page.drawImage(eventImage, {
+                x: imageDrawX,
+                y: imageDrawY,
+                width: scaledWidth,
+                height: scaledHeight,
+            });
+
+            // Dark transparent overlay
+            page.drawRectangle({
+                x: imageX,
+                y: imageY,
+                width: imageWidth,
+                height: imageHeight,
+                color: navy,
+                opacity: 0.40,
+            });
         }
     } catch (error) {
-        console.error("Event image error:", error.message);
+        console.error(
+            "Event image could not be loaded:",
+            error.message
+        );
     }
-
-    // Dark overlay on image
-    page.drawRectangle({
-        x: 280,
-        y: height - 255,
-        width: 292,
-        height: 233,
-        color: navy,
-        opacity: 0.35,
-    });
 
     // =========================================================
     // BRAND
     // =========================================================
 
-    page.drawText("EVENT HUB", {
-        x: 48,
-        y: height - 70,
+    // Logo circle
+    page.drawCircle({
+        x: 52,
+        y: height - 58,
+        size: 21,
+        color: deepPurple,
+    });
+
+    page.drawText("E", {
+        x: 44,
+        y: height - 66,
+        size: 17,
+        font: boldFont,
+        color: white,
+    });
+
+    page.drawText("EVENTORA", {
+        x: 82,
+        y: height - 64,
         size: 25,
         font: boldFont,
         color: white,
     });
 
-    page.drawText("Your Event, Your Experience", {
-        x: 49,
-        y: height - 91,
-        size: 9,
-        font: regularFont,
-        color: rgb(0.75, 0.78, 0.90),
-    });
+    page.drawText(
+        "Your Event, Your Experience",
+        {
+            x: 83,
+            y: height - 84,
+            size: 9,
+            font: regularFont,
+            color: rgb(0.72, 0.74, 0.86),
+        }
+    );
 
     // =========================================================
     // CONFIRMED BADGE
     // =========================================================
 
     page.drawRectangle({
-        x: 450,
-        y: height - 85,
-        width: 105,
-        height: 30,
+        x: 430,
+        y: height - 88,
+        width: 120,
+        height: 32,
         color: green,
     });
 
-    page.drawText(" CONFIRMED", {
-        x: 464,
-        y: height - 75,
+    page.drawText("CONFIRMED", {
+        x: 447,
+        y: height - 77,
         size: 10,
         font: boldFont,
         color: white,
     });
 
     // =========================================================
-    // EVENT TITLE
+    // EVENT LABEL
     // =========================================================
 
     page.drawText("EVENT", {
-        x: 48,
+        x: 45,
         y: height - 125,
-        size: 9,
+        size: 10,
         font: boldFont,
-        color: rgb(0.35, 0.45, 1),
+        color: rgb(0.55, 0.25, 1),
     });
 
-    const wrapText = (text, font, size, maxWidth) => {
+    // =========================================================
+    // EVENT TITLE
+    // =========================================================
+
+    const wrapText = (
+        text,
+        font,
+        fontSize,
+        maxWidth
+    ) => {
         const words = String(text).split(" ");
         const lines = [];
-        let line = "";
+
+        let current = "";
 
         for (const word of words) {
-            const test = line
-                ? `${line} ${word}`
+            const test = current
+                ? `${current} ${word}`
                 : word;
 
-            if (font.widthOfTextAtSize(test, size) <= maxWidth) {
-                line = test;
+            const testWidth =
+                font.widthOfTextAtSize(
+                    test,
+                    fontSize
+                );
+
+            if (testWidth <= maxWidth) {
+                current = test;
             } else {
-                if (line) lines.push(line);
-                line = word;
+                if (current) {
+                    lines.push(current);
+                }
+
+                current = word;
             }
         }
 
-        if (line) lines.push(line);
+        if (current) {
+            lines.push(current);
+        }
 
         return lines;
     };
@@ -169,163 +273,313 @@ export const generateTicketPDF = async (booking) => {
     const titleLines = wrapText(
         booking.eventId.title,
         boldFont,
-        23,
-        390
+        26,
+        400
     );
 
-    let titleY = height - 158;
+    let titleY = height - 164;
 
     titleLines.slice(0, 2).forEach((line) => {
         page.drawText(line, {
-            x: 48,
+            x: 45,
             y: titleY,
-            size: 23,
+            size: 26,
             font: boldFont,
             color: white,
         });
 
-        titleY -= 27;
+        titleY -= 31;
     });
 
     // =========================================================
-    // DATE + LOCATION ON HEADER
+    // DATE
     // =========================================================
 
     page.drawText("DATE", {
-        x: 48,
+        x: 45,
         y: height - 220,
-        size: 7,
+        size: 8,
         font: boldFont,
-        color: rgb(0.65, 0.70, 0.90),
+        color: rgb(0.70, 0.72, 0.85),
     });
 
-    page.drawText(String(booking.eventId.date), {
-        x: 48,
-        y: height - 238,
-        size: 11,
-        font: boldFont,
-        color: white,
-    });
+    page.drawText(
+        formatDate(booking.eventId.date),
+        {
+            x: 45,
+            y: height - 238,
+            size: 12,
+            font: boldFont,
+            color: white,
+        }
+    );
+
+    // =========================================================
+    // LOCATION
+    // =========================================================
 
     page.drawText("LOCATION", {
         x: 190,
         y: height - 220,
-        size: 7,
+        size: 8,
         font: boldFont,
-        color: rgb(0.65, 0.70, 0.90),
+        color: rgb(0.70, 0.72, 0.85),
     });
 
-    page.drawText(String(booking.eventId.location), {
-        x: 190,
-        y: height - 238,
-        size: 11,
-        font: boldFont,
-        color: white,
-        maxWidth: 300,
-    });
+    page.drawText(
+        String(booking.eventId.location),
+        {
+            x: 190,
+            y: height - 238,
+            size: 11,
+            font: boldFont,
+            color: white,
+            maxWidth: 330,
+        }
+    );
 
     // =========================================================
-    // TICKET DETAILS
+    // TICKET DETAILS TITLE
     // =========================================================
 
     page.drawText("TICKET DETAILS", {
-        x: 48,
+        x: 45,
         y: 315,
-        size: 10,
+        size: 11,
         font: boldFont,
-        color: blue,
+        color: purple,
     });
 
     page.drawLine({
-        start: { x: 48, y: 304 },
-        end: { x: 545, y: 304 },
+        start: {
+            x: 45,
+            y: 304,
+        },
+        end: {
+            x: 540,
+            y: 304,
+        },
         thickness: 1,
-        color: rgb(0.85, 0.86, 0.90),
+        color: borderGray,
     });
 
-    // Helper
-    const detail = (label, value, x, y) => {
-        page.drawText(label.toUpperCase(), {
-            x,
-            y,
-            size: 7,
-            font: boldFont,
-            color: grayText,
-        });
+    // =========================================================
+    // DETAIL HELPER
+    // =========================================================
 
-        page.drawText(String(value), {
-            x,
-            y: y - 18,
-            size: 11,
-            font: boldFont,
-            color: darkText,
-            maxWidth: 200,
-        });
+    const drawDetail = (
+        label,
+        value,
+        x,
+        y,
+        valueSize = 11
+    ) => {
+        page.drawText(
+            String(label).toUpperCase(),
+            {
+                x,
+                y,
+                size: 7,
+                font: boldFont,
+                color: gray,
+            }
+        );
+
+        page.drawText(
+            String(value),
+            {
+                x,
+                y: y - 18,
+                size: valueSize,
+                font: boldFont,
+                color: black,
+                maxWidth: 210,
+            }
+        );
     };
 
-    detail(
-        "ATTENDEE",
+    // =========================================================
+    // DETAILS
+    // =========================================================
+
+    drawDetail(
+        "Attendee",
         booking.userId.name,
-        48,
+        45,
         280
     );
 
-    detail(
-        "DATE",
-        booking.eventId.date,
+    drawDetail(
+        "Date",
+        formatDate(booking.eventId.date),
         300,
         280
     );
-
-    detail(
-        "LOCATION",
-        booking.eventId.location,
-        48,
-        225
-    );
-
-    detail(
-        "CATEGORY",
-        booking.eventId.category,
-        300,
-        225
-    );
-
-    detail(
-        "TICKET PRICE",
-        `INR ${booking.amount}`,
-        48,
-        170
-    );
-
-    // Email
-    page.drawText("EMAIL", {
-        x: 300,
-        y: 170,
-        size: 7,
-        font: boldFont,
-        color: grayText,
-    });
-
-    page.drawText(String(booking.userId.email), {
-        x: 300,
-        y: 152,
-        size: 10,
-        font: regularFont,
-        color: darkText,
-        maxWidth: 220,
-    });
-
-    // =========================================================
-    // DIVIDER
-    // =========================================================
 
     page.drawLine({
-        start: { x: 575, y: 45 },
-        end: { x: 575, y: height - 45 },
+        start: {
+            x: 285,
+            y: 255,
+        },
+        end: {
+            x: 285,
+            y: 295,
+        },
         thickness: 1,
-        color: rgb(0.75, 0.76, 0.80),
+        color: borderGray,
+    });
+
+    drawDetail(
+        "Location",
+        booking.eventId.location,
+        45,
+        230
+    );
+
+    drawDetail(
+        "Category",
+        booking.eventId.category,
+        300,
+        230
+    );
+
+    page.drawLine({
+        start: {
+            x: 285,
+            y: 205,
+        },
+        end: {
+            x: 285,
+            y: 245,
+        },
+        thickness: 1,
+        color: borderGray,
+    });
+
+    drawDetail(
+        "Ticket Price",
+        `INR ${booking.amount}`,
+        45,
+        180,
+        14
+    );
+
+    drawDetail(
+        "Email",
+        booking.userId.email,
+        300,
+        180,
+        9
+    );
+
+    // =========================================================
+    // FOOTER INFORMATION BOX
+    // =========================================================
+
+    page.drawRectangle({
+        x: 45,
+        y: 45,
+        width: 495,
+        height: 65,
+        color: lightPurple,
+        borderColor: rgb(0.82, 0.77, 0.98),
+        borderWidth: 1,
+    });
+
+    page.drawText("i", {
+        x: 62,
+        y: 77,
+        size: 17,
+        font: boldFont,
+        color: purple,
+    });
+
+    page.drawText(
+        "This ticket is valid only for the event mentioned above.",
+        {
+            x: 82,
+            y: 82,
+            size: 8,
+            font: regularFont,
+            color: darkGray,
+        }
+    );
+
+    page.drawText(
+        "Thank you for choosing Eventora.",
+        {
+            x: 82,
+            y: 62,
+            size: 10,
+            font: boldFont,
+            color: purple,
+        }
+    );
+
+    // =========================================================
+    // QR SIDE
+    // =========================================================
+
+    // Vertical perforated divider
+    page.drawLine({
+        start: {
+            x: 570,
+            y: 45,
+        },
+        end: {
+            x: 570,
+            y: height - 45,
+        },
+        thickness: 1,
+        color: rgb(0.72, 0.72, 0.78),
         dashArray: [6, 5],
+    });
+
+    // =========================================================
+    // QR HEADING
+    // =========================================================
+
+    page.drawText("SCAN TO VERIFY", {
+        x: 640,
+        y: 485,
+        size: 14,
+        font: boldFont,
+        color: purple,
+    });
+
+    page.drawText(
+        "Present this QR code",
+        {
+            x: 652,
+            y: 460,
+            size: 9,
+            font: regularFont,
+            color: darkGray,
+        }
+    );
+
+    page.drawText(
+        "at the event entrance.",
+        {
+            x: 648,
+            y: 445,
+            size: 9,
+            font: regularFont,
+            color: darkGray,
+        }
+    );
+
+    page.drawLine({
+        start: {
+            x: 620,
+            y: 425,
+        },
+        end: {
+            x: 790,
+            y: 425,
+        },
+        thickness: 1,
+        color: rgb(0.85, 0.82, 0.95),
     });
 
     // =========================================================
@@ -337,49 +591,35 @@ export const generateTicketPDF = async (booking) => {
         eventId: booking.eventId._id.toString(),
     });
 
-    const qrCodeDataUrl = await QRCode.toDataURL(qrData, {
-        width: 500,
-        margin: 1,
-        errorCorrectionLevel: "H",
-    });
-
-    const qrImage = await pdfDoc.embedPng(qrCodeDataUrl);
-
-    page.drawText("SCAN TO VERIFY", {
-        x: 640,
-        y: 505,
-        size: 13,
-        font: boldFont,
-        color: blue,
-    });
-
-    page.drawText(
-        "Present this QR code",
+    const qrDataUrl = await QRCode.toDataURL(
+        qrData,
         {
-            x: 647,
-            y: 482,
-            size: 9,
-            font: regularFont,
-            color: grayText,
+            width: 600,
+            margin: 1,
+            errorCorrectionLevel: "H",
         }
     );
 
-    page.drawText(
-        "at the event entrance.",
-        {
-            x: 647,
-            y: 468,
-            size: 9,
-            font: regularFont,
-            color: grayText,
-        }
+    const qrImage = await pdfDoc.embedPng(
+        qrDataUrl
     );
+
+    // White QR background
+    page.drawRectangle({
+        x: 615,
+        y: 210,
+        width: 185,
+        height: 195,
+        color: white,
+        borderColor: rgb(0.92, 0.92, 0.95),
+        borderWidth: 1,
+    });
 
     page.drawImage(qrImage, {
-        x: 620,
-        y: 250,
-        width: 185,
-        height: 185,
+        x: 625,
+        y: 220,
+        width: 165,
+        height: 165,
     });
 
     // =========================================================
@@ -387,74 +627,110 @@ export const generateTicketPDF = async (booking) => {
     // =========================================================
 
     page.drawText("BOOKING ID", {
-        x: 650,
-        y: 215,
+        x: 660,
+        y: 185,
         size: 8,
         font: boldFont,
-        color: grayText,
+        color: gray,
     });
 
     page.drawText(
-        booking._id.toString().slice(-16).toUpperCase(),
+        booking._id
+            .toString()
+            .slice(-16)
+            .toUpperCase(),
         {
-            x: 625,
-            y: 195,
+            x: 635,
+            y: 165,
             size: 10,
             font: boldFont,
-            color: darkText,
+            color: purple,
         }
     );
 
+    page.drawLine({
+        start: {
+            x: 620,
+            y: 135,
+        },
+        end: {
+            x: 790,
+            y: 135,
+        },
+        thickness: 1,
+        color: rgb(0.86, 0.83, 0.94),
+        dashArray: [5, 4],
+    });
+
     // =========================================================
-    // FOOTER
+    // SECURITY MESSAGE
     // =========================================================
 
-    page.drawLine({
-        start: { x: 48, y: 105 },
-        end: { x: 545, y: 105 },
-        thickness: 1,
-        color: rgb(0.88, 0.89, 0.92),
+    page.drawCircle({
+        x: 645,
+        y: 92,
+        size: 17,
+        color: lightPurple,
+    });
+
+    page.drawText("S", {
+        x: 639,
+        y: 86,
+        size: 10,
+        font: boldFont,
+        color: purple,
     });
 
     page.drawText(
-        "This ticket is valid only for the event mentioned above.",
+        "Keep this ticket safe",
         {
-            x: 48,
-            y: 82,
-            size: 8,
-            font: regularFont,
-            color: grayText,
-        }
-    );
-
-    page.drawText(
-        "Thank you for choosing Event Hub.",
-        {
-            x: 48,
-            y: 62,
+            x: 675,
+            y: 97,
             size: 9,
             font: boldFont,
-            color: darkText,
+            color: darkGray,
         }
     );
 
-    // Right footer
     page.drawText(
-        "Keep this ticket safe and do not share it.",
+        "and do not share it.",
         {
-            x: 620,
-            y: 75,
-            size: 8,
+            x: 675,
+            y: 81,
+            size: 9,
             font: regularFont,
-            color: grayText,
+            color: gray,
         }
     );
 
     // =========================================================
-    // RETURN BUFFER
+    // SAVE
     // =========================================================
 
     const pdfBytes = await pdfDoc.save();
 
     return Buffer.from(pdfBytes);
 };
+
+
+// =============================================================
+// DATE FORMATTER
+// =============================================================
+
+function formatDate(dateString) {
+    if (!dateString) return "";
+
+    const date = new Date(dateString);
+
+    if (Number.isNaN(date.getTime())) {
+        return String(dateString);
+    }
+
+    return date
+        .toLocaleDateString("en-GB", {
+            day: "2-digit",
+            month: "short",
+            year: "numeric",
+        })
+        .toUpperCase();
+}
