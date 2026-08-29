@@ -17,12 +17,13 @@ const sendBookingEmail = async (
     userEmail,
     userName,
     eventTitle,
-    ticketPath
+    ticketBuffer
 ) => {
     try {
         const mailOptions = {
             from: process.env.EMAIL_USER,
             to: userEmail,
+
             subject: `Booking Confirmed: ${eventTitle}`,
 
             html: `
@@ -40,8 +41,8 @@ const sendBookingEmail = async (
                     </p>
 
                     <p>
-                        Please download the ticket and present the
-                        QR code at the event entrance.
+                        Please download the PDF ticket and present
+                        the QR code at the event entrance.
                     </p>
 
                     <br>
@@ -55,7 +56,7 @@ const sendBookingEmail = async (
             attachments: [
                 {
                     filename: "EventHub-Ticket.pdf",
-                    path: ticketPath,
+                    content: ticketBuffer,
                     contentType: "application/pdf",
                 },
             ],
@@ -63,15 +64,19 @@ const sendBookingEmail = async (
 
         await transporter.sendMail(mailOptions);
 
-        console.log("Booking ticket email sent successfully to", userEmail);
+        console.log(
+            "Booking ticket email sent successfully to",
+            userEmail
+        );
     } catch (error) {
         console.error(
             "Error sending booking ticket email:",
-            error.message
+            error
         );
+
+        throw error;
     }
 };
-
 const sendOTPEmail = async (userEmail, otp, type) => {
     try {
         const title = type === 'account_verification' ? 'Verify your Eventora Account' : 'Eventora Booking Verification';

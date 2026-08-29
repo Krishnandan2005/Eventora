@@ -100,14 +100,14 @@ export const confirmBooking = async (req, res) => {
         await event.save();
 
         // Generate PDF ticket
-        const ticketPath = await generateTicketPDF(booking);
+        const ticketBuffer = await generateTicketPDF(booking);
 
         // Send ticket through email
         await sendBookingEmail(
             booking.userId.email,
             booking.userId.name,
             booking.eventId.title,
-            ticketPath
+            ticketBuffer
         );
 
         res.json({
@@ -122,42 +122,5 @@ export const confirmBooking = async (req, res) => {
             message: 'Server Error',
             error: error.message
         });
-    }
-};
-export const getMyBookings = async (req, res) => {
-    try {
-        const bookings = req.user.role === 'admin'
-            ? await Booking.find().populate('eventId').populate('userId', 'name email').sort({ createdAt: -1 })
-            : await Booking.find({ userId: req.user.id }).populate('eventId').sort({ createdAt: -1 });
-        res.json(bookings);
-    } catch (error) {
-        res.status(500).json({ message: 'Server Error', error: error.message });
-    }
-};
-
-export const cancelBooking = async (req, res) => {
-    try {
-        const booking = await Booking.findById(req.params.id);
-        if (!booking) return res.status(404).json({ message: 'Booking not found' });
-        if (booking.userId.toString() !== req.user.id && req.user.role !== 'admin') {
-            return res.status(403).json({ message: 'Not authorized' });
-        }
-        if (booking.status === 'cancelled') return res.status(400).json({ message: 'Already cancelled' });
-
-        const wasConfirmed = booking.status === 'confirmed';
-
-        booking.status = 'cancelled';
-        await booking.save();
-
-        if (wasConfirmed) {
-            const event = await Event.findById(booking.eventId);
-            if (event) {
-                event.availableSeats += 1;
-                await event.save();
-            }
-        }
-        res.json({ message: 'Booking cancelled successfully' });
-    } catch (error) {
-        res.status(500).json({ message: 'Server Error', error: error.message });
     }
 };
