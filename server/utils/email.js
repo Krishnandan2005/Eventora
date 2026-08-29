@@ -13,22 +13,62 @@ const transporter = nodemailer.createTransport({
     }
 });
 
-const sendBookingEmail = async (userEmail, userName, eventTitle) => {
+const sendBookingEmail = async (
+    userEmail,
+    userName,
+    eventTitle,
+    ticketPath
+) => {
     try {
         const mailOptions = {
             from: process.env.EMAIL_USER,
             to: userEmail,
             subject: `Booking Confirmed: ${eventTitle}`,
+
             html: `
-        <h2>Hi ${userName}!</h2>
-        <p>Your booking for the event <strong>${eventTitle}</strong> is successfully confirmed.</p>
-        <p>Thank you for choosing Eventora.</p>
-      `
+                <div style="font-family: Arial, sans-serif; padding: 20px;">
+                    <h2>Hi ${userName}!</h2>
+
+                    <p>
+                        Your booking for
+                        <strong>${eventTitle}</strong>
+                        has been successfully confirmed.
+                    </p>
+
+                    <p>
+                        Your event ticket is attached to this email.
+                    </p>
+
+                    <p>
+                        Please download the ticket and present the
+                        QR code at the event entrance.
+                    </p>
+
+                    <br>
+
+                    <p>
+                        Thank you for choosing <strong>Event Hub</strong>.
+                    </p>
+                </div>
+            `,
+
+            attachments: [
+                {
+                    filename: "EventHub-Ticket.pdf",
+                    path: ticketPath,
+                    contentType: "application/pdf",
+                },
+            ],
         };
+
         await transporter.sendMail(mailOptions);
-        console.log('Email sent successfully to', userEmail);
+
+        console.log("Booking ticket email sent successfully to", userEmail);
     } catch (error) {
-        console.error('Error sending email:', error);
+        console.error(
+            "Error sending booking ticket email:",
+            error.message
+        );
     }
 };
 

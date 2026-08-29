@@ -2,6 +2,7 @@ import Booking from '../models/Booking.models.js';
 import Event from '../models/Event.models.js';
 import Otp from '../models/OTP.models.js';
 import { sendBookingEmail, sendOTPEmail } from '../utils/email.js';
+import { generateTicketPDF } from "../utils/generateTicket.js";
 
 const generateOTP = () => Math.floor(100000 + Math.random() * 900000).toString();
 
@@ -54,33 +55,75 @@ export const bookEvent = async (req, res) => {
 export const confirmBooking = async (req, res) => {
     try {
         const { paymentStatus } = req.body;
-        const booking = await Booking.findById(req.params.id).populate('userId').populate('eventId');
-        if (!booking) return res.status(404).json({ message: 'Booking not found' });
 
-        if (booking.status === 'confirmed') return res.status(400).json({ message: 'Booking is already confirmed' });
+        const booking = await Booking.findById(req.params.id)
+            .populate('userId')
+            .populate('eventId');
 
-        const event = await Event.findById(booking.eventId._id);
-        if (event.availableSeats <= 0) {
-            return res.status(400).json({ message: 'No seats available to confirm this booking' });
+        if (!booking) {
+            return res.status(404).json({
+                message: 'Booking not found'
+            });
         }
 
+        if (booking.status === 'confirmed') {
+            return res.status(400).json({
+                message: 'Booking is already confirmed'
+            });
+        }
+
+        const event = await Event.findById(booking.eventId._id);
+
+        if (!event) {
+            return res.status(404).json({
+                message: 'Event not found'
+            });
+        }
+
+        if (event.availableSeats <= 0) {
+            return res.status(400).json({
+                message: 'No seats available to confirm this booking'
+            });
+        }
+
+        // Confirm booking
         booking.status = 'confirmed';
+
         if (paymentStatus) {
             booking.paymentStatus = paymentStatus;
         }
+
         await booking.save();
 
+        // Decrease available seats
         event.availableSeats -= 1;
         await event.save();
 
-        await sendBookingEmail(booking.userId.email, booking.userId.name, booking.eventId.title);
+        // Generate PDF ticket
+        const ticketPath = await generateTicketPDF(booking);
 
-        res.json({ message: 'Booking confirmed successfully', booking });
+        // Send ticket through email
+        await sendBookingEmail(
+            booking.userId.email,
+            booking.userId.name,
+            booking.eventId.title,
+            ticketPath
+        );
+
+        res.json({
+            message: 'Booking confirmed and ticket sent successfully',
+            booking
+        });
+
     } catch (error) {
-        res.status(500).json({ message: 'Server Error', error: error.message });
+        console.error('Confirm booking error:', error);
+
+        res.status(500).json({
+            message: 'Server Error',
+            error: error.message
+        });
     }
 };
-
 export const getMyBookings = async (req, res) => {
     try {
         const bookings = req.user.role === 'admin'
