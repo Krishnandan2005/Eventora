@@ -14,14 +14,15 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-// ===============================
+// ======================================================
 // BOOKING CONFIRMATION EMAIL
-// ===============================
+// ======================================================
+
 const sendBookingEmail = async (
   userEmail,
   userName,
   eventTitle,
-  ticketBuffer,
+  ticketBuffer
 ) => {
   try {
     const mailOptions = {
@@ -40,6 +41,7 @@ const sendBookingEmail = async (
           color: #222;
         ">
 
+          <!-- HEADER -->
           <div style="
             background: linear-gradient(135deg, #3214a8, #6d28d9);
             padding: 25px;
@@ -47,6 +49,7 @@ const sendBookingEmail = async (
             text-align: center;
             color: white;
           ">
+
             <h1 style="
               margin: 0;
               font-size: 28px;
@@ -62,8 +65,11 @@ const sendBookingEmail = async (
             ">
               Your Event, Your Experience
             </p>
+
           </div>
 
+
+          <!-- CONTENT -->
           <div style="
             background: white;
             padding: 30px;
@@ -77,9 +83,14 @@ const sendBookingEmail = async (
               Booking Confirmed!
             </h2>
 
-            <p style="font-size: 16px;">
+
+            <p style="
+              font-size: 16px;
+              margin-bottom: 10px;
+            ">
               Hi <strong>${userName}</strong>,
             </p>
+
 
             <p style="
               font-size: 15px;
@@ -91,6 +102,8 @@ const sendBookingEmail = async (
               has been successfully confirmed.
             </p>
 
+
+            <!-- TICKET MESSAGE -->
             <div style="
               margin: 25px 0;
               padding: 18px;
@@ -98,15 +111,30 @@ const sendBookingEmail = async (
               border-left: 4px solid #6d28d9;
               border-radius: 6px;
             ">
+
               <p style="
                 margin: 0;
                 color: #444;
                 font-size: 14px;
+                line-height: 1.6;
               ">
-                Your <strong>Eventora ticket</strong> is attached to this
-                email as a PNG image.
+                Your <strong>Eventora ticket</strong> is attached
+                to this email as a PDF.
               </p>
+
             </div>
+
+
+            <p style="
+              font-size: 14px;
+              line-height: 1.6;
+              color: #666;
+            ">
+              Your PDF contains the
+              <strong>front and back of your ticket</strong>
+              on a single page.
+            </p>
+
 
             <p style="
               font-size: 14px;
@@ -117,17 +145,51 @@ const sendBookingEmail = async (
               <strong>QR code</strong> at the event entrance.
             </p>
 
+
+            <!-- IMPORTANT -->
+            <div style="
+              margin-top: 25px;
+              padding: 15px;
+              background: #f8f7ff;
+              border-radius: 8px;
+              text-align: center;
+            ">
+
+              <p style="
+                margin: 0;
+                font-size: 13px;
+                color: #666;
+              ">
+                Ticket format
+              </p>
+
+              <p style="
+                margin: 5px 0 0;
+                font-size: 14px;
+                font-weight: bold;
+                color: #3214a8;
+              ">
+                A5 Landscape • Front + Back
+              </p>
+
+            </div>
+
+
             <p style="
               margin-top: 30px;
               font-size: 14px;
               color: #777;
             ">
               Thank you for choosing
-              <strong style="color: #3214a8;">Eventora</strong>.
+              <strong style="color: #3214a8;">
+                Eventora
+              </strong>.
             </p>
 
           </div>
 
+
+          <!-- FOOTER -->
           <p style="
             text-align: center;
             margin-top: 20px;
@@ -140,52 +202,73 @@ const sendBookingEmail = async (
         </div>
       `,
 
+      // ==================================================
+      // PDF ATTACHMENT
+      // ==================================================
+
       attachments: [
         {
-          filename: "Eventora-Ticket.png",
+          filename: "Eventora-Ticket.pdf",
           content: ticketBuffer,
-          contentType: "image/png",
+          contentType: "application/pdf",
         },
       ],
     };
+
 
     await transporter.sendMail(mailOptions);
 
     console.log(
       "Booking ticket email sent successfully to",
-      userEmail,
+      userEmail
     );
+
   } catch (error) {
+
     console.error(
       "Error sending booking ticket email:",
-      error,
+      error
     );
 
     throw error;
   }
 };
 
-// ===============================
+
+// ======================================================
 // OTP EMAIL
-// ===============================
-const sendOTPEmail = async (userEmail, otp, type) => {
+// ======================================================
+
+const sendOTPEmail = async (
+  userEmail,
+  otp,
+  type
+) => {
+
   try {
+
     const isAccountVerification =
       type === "account_verification";
+
 
     const title = isAccountVerification
       ? "Verify your Eventora Account"
       : "Eventora Booking Verification";
 
+
     const msg = isAccountVerification
       ? "Please use the following OTP to verify your new Eventora account."
       : "Please use the following OTP to verify and confirm your event booking.";
 
+
     const mailOptions = {
+
       from: `"Eventora" <${process.env.EMAIL_USER}>`,
+
       to: userEmail,
 
       subject: title,
+
 
       html: `
         <div style="
@@ -197,12 +280,16 @@ const sendOTPEmail = async (userEmail, otp, type) => {
           background-color: #f8f7ff;
         ">
 
+
+          <!-- HEADER -->
+
           <div style="
             background: linear-gradient(135deg, #3214a8, #6d28d9);
             padding: 20px;
             border-radius: 12px 12px 0 0;
             color: white;
           ">
+
             <h1 style="
               margin: 0;
               font-size: 26px;
@@ -216,7 +303,11 @@ const sendOTPEmail = async (userEmail, otp, type) => {
             ">
               Your Event, Your Experience
             </p>
+
           </div>
+
+
+          <!-- OTP CONTENT -->
 
           <div style="
             background: white;
@@ -224,9 +315,13 @@ const sendOTPEmail = async (userEmail, otp, type) => {
             border-radius: 0 0 12px 12px;
           ">
 
-            <h2 style="color: #3214a8;">
+            <h2 style="
+              color: #3214a8;
+              margin-top: 0;
+            ">
               ${title}
             </h2>
+
 
             <p style="
               color: #555;
@@ -235,6 +330,9 @@ const sendOTPEmail = async (userEmail, otp, type) => {
             ">
               ${msg}
             </p>
+
+
+            <!-- OTP -->
 
             <div style="
               display: inline-block;
@@ -251,6 +349,7 @@ const sendOTPEmail = async (userEmail, otp, type) => {
               ${otp}
             </div>
 
+
             <p style="
               color: #999;
               font-size: 12px;
@@ -266,21 +365,30 @@ const sendOTPEmail = async (userEmail, otp, type) => {
       `,
     };
 
+
     await transporter.sendMail(mailOptions);
 
+
     console.log(
-      `OTP sent to ${userEmail} for ${type}`,
-    );
-  } catch (error) {
-    console.error(
-      "Error sending OTP email:",
-      error,
+      `OTP sent to ${userEmail} for ${type}`
     );
 
-    // Keep your existing OTP behavior:
-    // don't crash the request if email sending fails.
+  } catch (error) {
+
+    console.error(
+      "Error sending OTP email:",
+      error
+    );
+
+    // OTP behavior remains unchanged.
+    // Email failure does not crash the request.
   }
 };
+
+
+// ======================================================
+// EXPORTS
+// ======================================================
 
 export {
   sendBookingEmail,

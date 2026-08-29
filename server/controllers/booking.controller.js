@@ -1,108 +1,302 @@
-import Booking from '../models/Booking.models.js';
-import Event from '../models/Event.models.js';
-import Otp from '../models/OTP.models.js';
-import { sendBookingEmail, sendOTPEmail } from '../utils/email.js';
-import { generateTicketPNG } from "../utils/generateTicket.js";
+import Booking from "../models/Booking.models.js";
+import Event from "../models/Event.models.js";
+import Otp from "../models/OTP.models.js";
 
-const generateOTP = () => Math.floor(100000 + Math.random() * 900000).toString();
+import {
+    sendBookingEmail,
+    sendOTPEmail,
+} from "../utils/email.js";
+
+import {
+    generateTicketPDF,
+} from "../utils/generateTicket.js";
+
+
+// ======================================================
+// GENERATE OTP
+// ======================================================
+
+const generateOTP = () =>
+    Math.floor(
+        100000 + Math.random() * 900000
+    ).toString();
+
+
+// ======================================================
+// SEND BOOKING OTP
+// ======================================================
 
 export const sendBookingOTP = async (req, res) => {
     try {
+
         const otp = generateOTP();
-        await Otp.findOneAndDelete({ email: req.user.email, action: 'event_booking' });
-        await Otp.create({ email: req.user.email, otp, action: 'event_booking' });
-        await sendOTPEmail(req.user.email, otp, 'event_booking');
-        res.json({ message: 'OTP sent successfully' });
+
+        // Remove previous booking OTP
+        await Otp.findOneAndDelete({
+            email: req.user.email,
+            action: "event_booking",
+        });
+
+        // Create new OTP
+        await Otp.create({
+            email: req.user.email,
+            otp,
+            action: "event_booking",
+        });
+
+        // Send OTP email
+        await sendOTPEmail(
+            req.user.email,
+            otp,
+            "event_booking"
+        );
+
+        res.json({
+            message: "OTP sent successfully",
+        });
+
     } catch (error) {
-        res.status(500).json({ message: 'Error sending OTP', error: error.message });
+
+        console.error(
+            "Send booking OTP error:",
+            error
+        );
+
+        res.status(500).json({
+            message: "Error sending OTP",
+            error: error.message,
+        });
     }
 };
+
+
+// ======================================================
+// BOOK EVENT
+// ======================================================
 
 export const bookEvent = async (req, res) => {
     try {
-        const { eventId, otp } = req.body;
 
-        const validOTP = await Otp.findOne({ email: req.user.email, otp, action: 'event_booking' });
-        if (!validOTP) {
-            return res.status(400).json({ message: 'Invalid or expired OTP for booking' });
-        }
-
-        const event = await Event.findById(eventId);
-        if (!event) return res.status(404).json({ message: 'Event not found' });
-        if (event.availableSeats <= 0) return res.status(400).json({ message: 'No seats available' });
-
-        const existingBooking = await Booking.findOne({ userId: req.user.id, eventId });
-        if (existingBooking && existingBooking.status !== 'cancelled') {
-            return res.status(400).json({ message: 'Already booked or pending' });
-        }
-
-        const booking = await Booking.create({
-            userId: req.user.id,
+        const {
             eventId,
-            status: 'pending',
-            paymentStatus: 'not_paid',
-            amount: event.ticketPrice
+            otp,
+        } = req.body;
+
+        // ----------------------------------------------
+        // VERIFY OTP
+        // ----------------------------------------------
+
+        const validOTP = await Otp.findOne({
+            email: req.user.email,
+            otp,
+            action: "event_booking",
         });
 
-        await Otp.deleteOne({ _id: validOTP._id });
-
-        res.status(201).json({ message: 'Booking request submitted', booking });
-    } catch (error) {
-        res.status(500).json({ message: 'Server Error', error: error.message });
-    }
-};
-
-export const confirmBooking = async (req, res) => {
-    try {
-        const { paymentStatus } = req.body;
-
-        const booking = await Booking.findById(req.params.id)
-            .populate('userId')
-            .populate('eventId');
-
-        if (!booking) {
-            return res.status(404).json({
-                message: 'Booking not found'
-            });
-        }
-
-        if (booking.status === 'confirmed') {
+        if (!validOTP) {
             return res.status(400).json({
-                message: 'Booking is already confirmed'
+                message:
+                    "Invalid or expired OTP for booking",
             });
         }
 
-        const event = await Event.findById(booking.eventId._id);
+
+        // ----------------------------------------------
+        // FIND EVENT
+        // ----------------------------------------------
+
+        const event =
+            await Event.findById(eventId);
 
         if (!event) {
             return res.status(404).json({
-                message: 'Event not found'
+                message: "Event not found",
             });
         }
+
+
+        // ----------------------------------------------
+        // CHECK SEATS
+        // ----------------------------------------------
 
         if (event.availableSeats <= 0) {
             return res.status(400).json({
-                message: 'No seats available to confirm this booking'
+                message: "No seats available",
             });
         }
 
-        // Confirm booking
-        booking.status = 'confirmed';
+
+        // ----------------------------------------------
+        // CHECK EXISTING BOOKING
+        // ----------------------------------------------
+
+        const existingBooking =
+            await Booking.findOne({
+                userId: req.user.id,
+                eventId,
+            });
+
+        if (
+            existingBooking &&
+            existingBooking.status !== "cancelled"
+        ) {
+            return res.status(400).json({
+                message:
+                    "Already booked or pending",
+            });
+        }
+
+
+        // ----------------------------------------------
+        // CREATE BOOKING
+        // ----------------------------------------------
+
+        const booking =
+            await Booking.create({
+                userId: req.user.id,
+                eventId,
+                status: "pending",
+                paymentStatus: "not_paid",
+                amount: event.ticketPrice,
+            });
+
+
+        // ----------------------------------------------
+        // DELETE USED OTP
+        // ----------------------------------------------
+
+        await Otp.deleteOne({
+            _id: validOTP._id,
+        });
+
+
+        res.status(201).json({
+            message:
+                "Booking request submitted",
+            booking,
+        });
+
+    } catch (error) {
+
+        console.error(
+            "Book event error:",
+            error
+        );
+
+        res.status(500).json({
+            message: "Server Error",
+            error: error.message,
+        });
+    }
+};
+
+
+// ======================================================
+// CONFIRM BOOKING
+// ======================================================
+
+export const confirmBooking = async (req, res) => {
+    try {
+
+        const {
+            paymentStatus,
+        } = req.body;
+
+
+        // ----------------------------------------------
+        // GET BOOKING
+        // ----------------------------------------------
+
+        const booking =
+            await Booking.findById(req.params.id)
+                .populate("userId")
+                .populate("eventId");
+
+
+        if (!booking) {
+            return res.status(404).json({
+                message: "Booking not found",
+            });
+        }
+
+
+        // ----------------------------------------------
+        // CHECK ALREADY CONFIRMED
+        // ----------------------------------------------
+
+        if (booking.status === "confirmed") {
+            return res.status(400).json({
+                message:
+                    "Booking is already confirmed",
+            });
+        }
+
+
+        // ----------------------------------------------
+        // GET EVENT
+        // ----------------------------------------------
+
+        const event =
+            await Event.findById(
+                booking.eventId._id
+            );
+
+
+        if (!event) {
+            return res.status(404).json({
+                message: "Event not found",
+            });
+        }
+
+
+        // ----------------------------------------------
+        // CHECK AVAILABLE SEATS
+        // ----------------------------------------------
+
+        if (event.availableSeats <= 0) {
+            return res.status(400).json({
+                message:
+                    "No seats available to confirm this booking",
+            });
+        }
+
+
+        // ----------------------------------------------
+        // CONFIRM BOOKING
+        // ----------------------------------------------
+
+        booking.status = "confirmed";
+
 
         if (paymentStatus) {
-            booking.paymentStatus = paymentStatus;
+            booking.paymentStatus =
+                paymentStatus;
         }
+
 
         await booking.save();
 
-        // Decrease available seats
+
+        // ----------------------------------------------
+        // DECREASE AVAILABLE SEATS
+        // ----------------------------------------------
+
         event.availableSeats -= 1;
+
         await event.save();
 
-        // Generate PNG ticket
-        const ticketBuffer = await generateTicketPNG(booking);
 
-        // Send ticket through email
+        // ----------------------------------------------
+        // GENERATE PDF TICKET
+        // ----------------------------------------------
+
+        const ticketBuffer =
+            await generateTicketPDF(booking);
+
+
+        // ----------------------------------------------
+        // SEND PDF THROUGH EMAIL
+        // ----------------------------------------------
+
         await sendBookingEmail(
             booking.userId.email,
             booking.userId.name,
@@ -110,86 +304,188 @@ export const confirmBooking = async (req, res) => {
             ticketBuffer
         );
 
+
+        // ----------------------------------------------
+        // RESPONSE
+        // ----------------------------------------------
+
         res.json({
-            message: 'Booking confirmed and ticket sent successfully',
-            booking
+            message:
+                "Booking confirmed and ticket sent successfully",
+
+            booking,
         });
 
     } catch (error) {
-        console.error('Confirm booking error:', error);
+
+        console.error(
+            "Confirm booking error:",
+            error
+        );
 
         res.status(500).json({
-            message: 'Server Error',
-            error: error.message
+            message: "Server Error",
+            error: error.message,
         });
     }
 };
-export const getMyBookings = async (req, res) => {
+
+
+// ======================================================
+// GET MY BOOKINGS
+// ======================================================
+
+export const getMyBookings = async (
+    req,
+    res
+) => {
     try {
-        const bookings = req.user.role === 'admin'
-            ? await Booking.find()
-                .populate('eventId')
-                .populate('userId', 'name email')
-                .sort({ createdAt: -1 })
-            : await Booking.find({ userId: req.user.id })
-                .populate('eventId')
-                .sort({ createdAt: -1 });
+
+        const bookings =
+            req.user.role === "admin"
+
+                ? await Booking.find()
+                    .populate("eventId")
+                    .populate(
+                        "userId",
+                        "name email"
+                    )
+                    .sort({
+                        createdAt: -1,
+                    })
+
+                : await Booking.find({
+                    userId: req.user.id,
+                })
+                    .populate("eventId")
+                    .sort({
+                        createdAt: -1,
+                    });
+
 
         res.json(bookings);
+
     } catch (error) {
+
+        console.error(
+            "Get bookings error:",
+            error
+        );
+
         res.status(500).json({
-            message: 'Server Error',
-            error: error.message
+            message: "Server Error",
+            error: error.message,
         });
     }
 };
 
-export const cancelBooking = async (req, res) => {
+
+// ======================================================
+// CANCEL BOOKING
+// ======================================================
+
+export const cancelBooking = async (
+    req,
+    res
+) => {
     try {
-        const booking = await Booking.findById(req.params.id);
+
+        // ----------------------------------------------
+        // FIND BOOKING
+        // ----------------------------------------------
+
+        const booking =
+            await Booking.findById(
+                req.params.id
+            );
+
 
         if (!booking) {
             return res.status(404).json({
-                message: 'Booking not found'
+                message: "Booking not found",
             });
         }
+
+
+        // ----------------------------------------------
+        // AUTHORIZATION
+        // ----------------------------------------------
 
         if (
-            booking.userId.toString() !== req.user.id &&
-            req.user.role !== 'admin'
+            booking.userId.toString() !==
+                req.user.id &&
+            req.user.role !== "admin"
         ) {
             return res.status(403).json({
-                message: 'Not authorized'
+                message: "Not authorized",
             });
         }
 
-        if (booking.status === 'cancelled') {
+
+        // ----------------------------------------------
+        // ALREADY CANCELLED
+        // ----------------------------------------------
+
+        if (booking.status === "cancelled") {
             return res.status(400).json({
-                message: 'Already cancelled'
+                message: "Already cancelled",
             });
         }
 
-        const wasConfirmed = booking.status === 'confirmed';
 
-        booking.status = 'cancelled';
+        // ----------------------------------------------
+        // CHECK IF CONFIRMED
+        // ----------------------------------------------
+
+        const wasConfirmed =
+            booking.status === "confirmed";
+
+
+        // ----------------------------------------------
+        // CANCEL BOOKING
+        // ----------------------------------------------
+
+        booking.status = "cancelled";
+
         await booking.save();
 
+
+        // ----------------------------------------------
+        // RESTORE SEAT
+        // ----------------------------------------------
+
         if (wasConfirmed) {
-            const event = await Event.findById(booking.eventId);
+
+            const event =
+                await Event.findById(
+                    booking.eventId
+                );
+
 
             if (event) {
+
                 event.availableSeats += 1;
+
                 await event.save();
             }
         }
 
+
         res.json({
-            message: 'Booking cancelled successfully'
+            message:
+                "Booking cancelled successfully",
         });
+
     } catch (error) {
+
+        console.error(
+            "Cancel booking error:",
+            error
+        );
+
         res.status(500).json({
-            message: 'Server Error',
-            error: error.message
+            message: "Server Error",
+            error: error.message,
         });
     }
 };
