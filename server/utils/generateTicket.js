@@ -8,7 +8,7 @@ const MM = 2.83465;
 const PAGE_WIDTH = 210 * MM;
 const PAGE_HEIGHT = 148 * MM;
 
-// ID CARD / TICKET SIZE
+//TICKET SIZE
 const TICKET_WIDTH = 85.6 * MM;
 const TICKET_HEIGHT = 140 * MM;
 
@@ -55,9 +55,6 @@ const COLORS = {
 // SAFE TEXT
 // ======================================================
 
-// pdf-lib StandardFonts use WinAnsi encoding.
-// Emojis and symbols like "✓" can crash Vercel.
-//
 // This function removes unsupported characters.
 const safeText = (value) => {
     if (value === null || value === undefined) {
@@ -184,7 +181,7 @@ const roundedRect = (
     height,
     color,
     radius = 4,
-    borderColor = null,
+    borderColor = undefined,
     borderWidth = 0
 ) => {
     page.drawRectangle({
