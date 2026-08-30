@@ -28,183 +28,117 @@ const sendBookingEmail = async (
     const mailOptions = {
       from: `"Eventora" <${process.env.EMAIL_USER}>`,
       to: userEmail,
-
       subject: `Booking Confirmed: ${eventTitle}`,
 
       html: `
-        <div style="
-          font-family: Arial, sans-serif;
-          max-width: 600px;
-          margin: 0 auto;
-          padding: 30px 20px;
-          background-color: #f8f7ff;
-          color: #222;
-        ">
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        </head>
+        <body style="margin:0; padding:0; background-color:#f4f2ff; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+          
+          <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f4f2ff; padding: 40px 16px;">
+            <tr>
+              <td align="center">
+                
+                <!-- Main Card -->
+                <table width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width: 580px; background: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 8px 30px rgba(50, 20, 168, 0.12);">
+                  
+                  <!-- Header -->
+                  <tr>
+                    <td style="background: linear-gradient(135deg, #3214a8 0%, #6d28d9 100%); padding: 36px 32px; text-align: center;">
+                      <h1 style="margin: 0; font-size: 26px; font-weight: 700; letter-spacing: 2px; color: #ffffff;">
+                        EVENTORA
+                      </h1>
+                      <p style="margin: 8px 0 0; font-size: 13px; color: rgba(255,255,255,0.85); letter-spacing: 0.5px;">
+                        Your Event, Your Experience
+                      </p>
+                    </td>
+                  </tr>
 
-          <!-- HEADER -->
-          <div style="
-            background: linear-gradient(135deg, #3214a8, #6d28d9);
-            padding: 25px;
-            border-radius: 12px 12px 0 0;
-            text-align: center;
-            color: white;
-          ">
+                  <!-- Body -->
+                  <tr>
+                    <td style="padding: 40px 32px 32px;">
+                      
+                      <!-- Success Badge -->
+                      <div style="text-align: center; margin-bottom: 28px;">
+                        <div style="display: inline-block; background: #f0ebff; color: #3214a8; font-size: 13px; font-weight: 600; padding: 8px 18px; border-radius: 50px; letter-spacing: 0.3px;">
+                          ✓ Booking Confirmed
+                        </div>
+                      </div>
 
-            <h1 style="
-              margin: 0;
-              font-size: 28px;
-              letter-spacing: 1px;
-            ">
-              EVENTORA
-            </h1>
+                      <h2 style="margin: 0 0 20px; font-size: 22px; font-weight: 700; color: #1a1a2e; text-align: center;">
+                        You're all set!
+                      </h2>
 
-            <p style="
-              margin: 8px 0 0;
-              font-size: 14px;
-              opacity: 0.9;
-            ">
-              Your Event, Your Experience
-            </p>
+                      <p style="margin: 0 0 8px; font-size: 16px; color: #333; line-height: 1.5; text-align: center;">
+                        Hi <strong style="color: #3214a8;">${userName}</strong>,
+                      </p>
 
-          </div>
+                      <p style="margin: 0 0 28px; font-size: 15px; color: #555; line-height: 1.65; text-align: center;">
+                        Your booking for<br>
+                        <strong style="color: #1a1a2e; font-size: 16px;">${eventTitle}</strong><br>
+                        has been successfully confirmed.
+                      </p>
 
+                      <!-- Ticket Info Card -->
+                      <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background: #f8f6ff; border-radius: 12px; border: 1px solid #e9e4ff; margin-bottom: 28px;">
+                        <tr>
+                          <td style="padding: 22px 24px;">
+                            <p style="margin: 0 0 10px; font-size: 14px; color: #444; line-height: 1.6;">
+                              🎟️ Your <strong>Eventora ticket</strong> is attached to this email as a PDF.
+                            </p>
+                            <p style="margin: 0; font-size: 13px; color: #666; line-height: 1.6;">
+                              The PDF contains the <strong>front and back</strong> of your ticket on a single page. Please keep it safe and present the <strong>QR code</strong> at the entrance.
+                            </p>
+                          </td>
+                        </tr>
+                      </table>
 
-          <!-- CONTENT -->
-          <div style="
-            background: white;
-            padding: 30px;
-            border-radius: 0 0 12px 12px;
-          ">
+                      <!-- Format Badge -->
+                      <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom: 32px;">
+                        <tr>
+                          <td align="center">
+                            <div style="display: inline-block; background: #ffffff; border: 1.5px solid #d4c9ff; border-radius: 10px; padding: 14px 28px; text-align: center;">
+                              <p style="margin: 0 0 4px; font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 1px;">
+                                Ticket Format
+                              </p>
+                              <p style="margin: 0; font-size: 15px; font-weight: 700; color: #3214a8;">
+                                A5 Landscape • Front + Back
+                              </p>
+                            </div>
+                          </td>
+                        </tr>
+                      </table>
 
-            <h2 style="
-              margin-top: 0;
-              color: #3214a8;
-            ">
-              Booking Confirmed!
-            </h2>
+                      <p style="margin: 0; font-size: 14px; color: #777; line-height: 1.6; text-align: center;">
+                        Thank you for choosing<br>
+                        <strong style="color: #3214a8; font-size: 15px;">Eventora</strong>
+                      </p>
 
+                    </td>
+                  </tr>
 
-            <p style="
-              font-size: 16px;
-              margin-bottom: 10px;
-            ">
-              Hi <strong>${userName}</strong>,
-            </p>
+                  <!-- Footer -->
+                  <tr>
+                    <td style="background: #faf9ff; padding: 20px 32px; text-align: center; border-top: 1px solid #eeeaf8;">
+                      <p style="margin: 0; font-size: 12px; color: #999; line-height: 1.5;">
+                        This is an automated email. Please do not reply.
+                      </p>
+                    </td>
+                  </tr>
 
+                </table>
 
-            <p style="
-              font-size: 15px;
-              line-height: 1.6;
-              color: #555;
-            ">
-              Your booking for
-              <strong>${eventTitle}</strong>
-              has been successfully confirmed.
-            </p>
+              </td>
+            </tr>
+          </table>
 
-
-            <!-- TICKET MESSAGE -->
-            <div style="
-              margin: 25px 0;
-              padding: 18px;
-              background: #f3efff;
-              border-left: 4px solid #6d28d9;
-              border-radius: 6px;
-            ">
-
-              <p style="
-                margin: 0;
-                color: #444;
-                font-size: 14px;
-                line-height: 1.6;
-              ">
-                Your <strong>Eventora ticket</strong> is attached
-                to this email as a PDF.
-              </p>
-
-            </div>
-
-
-            <p style="
-              font-size: 14px;
-              line-height: 1.6;
-              color: #666;
-            ">
-              Your PDF contains the
-              <strong>front and back of your ticket</strong>
-              on a single page.
-            </p>
-
-
-            <p style="
-              font-size: 14px;
-              line-height: 1.6;
-              color: #666;
-            ">
-              Please keep your ticket safe and present the
-              <strong>QR code</strong> at the event entrance.
-            </p>
-
-
-            <!-- IMPORTANT -->
-            <div style="
-              margin-top: 25px;
-              padding: 15px;
-              background: #f8f7ff;
-              border-radius: 8px;
-              text-align: center;
-            ">
-
-              <p style="
-                margin: 0;
-                font-size: 13px;
-                color: #666;
-              ">
-                Ticket format
-              </p>
-
-              <p style="
-                margin: 5px 0 0;
-                font-size: 14px;
-                font-weight: bold;
-                color: #3214a8;
-              ">
-                A5 Landscape • Front + Back
-              </p>
-
-            </div>
-
-
-            <p style="
-              margin-top: 30px;
-              font-size: 14px;
-              color: #777;
-            ">
-              Thank you for choosing
-              <strong style="color: #3214a8;">
-                Eventora
-              </strong>.
-            </p>
-
-          </div>
-
-
-          <!-- FOOTER -->
-          <p style="
-            text-align: center;
-            margin-top: 20px;
-            font-size: 12px;
-            color: #999;
-          ">
-            This is an automated email. Please do not reply.
-          </p>
-
-        </div>
+        </body>
+        </html>
       `,
-
-      // ==================================================
-      // PDF ATTACHMENT
-      // ==================================================
 
       attachments: [
         {
@@ -215,182 +149,121 @@ const sendBookingEmail = async (
       ],
     };
 
-
     await transporter.sendMail(mailOptions);
-
-    console.log(
-      "Booking ticket email sent successfully to",
-      userEmail
-    );
-
+    console.log("Booking ticket email sent successfully to", userEmail);
   } catch (error) {
-
-    console.error(
-      "Error sending booking ticket email:",
-      error
-    );
-
+    console.error("Error sending booking ticket email:", error);
     throw error;
   }
 };
-
 
 // ======================================================
 // OTP EMAIL
 // ======================================================
 
-const sendOTPEmail = async (
-  userEmail,
-  otp,
-  type
-) => {
-
+const sendOTPEmail = async (userEmail, otp, type) => {
   try {
-
-    const isAccountVerification =
-      type === "account_verification";
-
+    const isAccountVerification = type === "account_verification";
 
     const title = isAccountVerification
       ? "Verify your Eventora Account"
       : "Eventora Booking Verification";
 
-
     const msg = isAccountVerification
       ? "Please use the following OTP to verify your new Eventora account."
       : "Please use the following OTP to verify and confirm your event booking.";
 
-
     const mailOptions = {
-
       from: `"Eventora" <${process.env.EMAIL_USER}>`,
-
       to: userEmail,
-
       subject: title,
 
-
       html: `
-        <div style="
-          font-family: Arial, sans-serif;
-          max-width: 500px;
-          margin: 0 auto;
-          padding: 30px 20px;
-          text-align: center;
-          background-color: #f8f7ff;
-        ">
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        </head>
+        <body style="margin:0; padding:0; background-color:#f4f2ff; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+          
+          <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f4f2ff; padding: 40px 16px;">
+            <tr>
+              <td align="center">
+                
+                <!-- Main Card -->
+                <table width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width: 480px; background: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 8px 30px rgba(50, 20, 168, 0.12);">
+                  
+                  <!-- Header -->
+                  <tr>
+                    <td style="background: linear-gradient(135deg, #3214a8 0%, #6d28d9 100%); padding: 32px 28px; text-align: center;">
+                      <h1 style="margin: 0; font-size: 24px; font-weight: 700; letter-spacing: 2px; color: #ffffff;">
+                        EVENTORA
+                      </h1>
+                      <p style="margin: 6px 0 0; font-size: 12px; color: rgba(255,255,255,0.85); letter-spacing: 0.4px;">
+                        Your Event, Your Experience
+                      </p>
+                    </td>
+                  </tr>
 
+                  <!-- Body -->
+                  <tr>
+                    <td style="padding: 36px 28px 32px; text-align: center;">
+                      
+                      <h2 style="margin: 0 0 16px; font-size: 20px; font-weight: 700; color: #1a1a2e;">
+                        ${title}
+                      </h2>
 
-          <!-- HEADER -->
+                      <p style="margin: 0 0 28px; font-size: 15px; color: #555; line-height: 1.6;">
+                        ${msg}
+                      </p>
 
-          <div style="
-            background: linear-gradient(135deg, #3214a8, #6d28d9);
-            padding: 20px;
-            border-radius: 12px 12px 0 0;
-            color: white;
-          ">
+                      <!-- OTP Box -->
+                      <div style="display: inline-block; background: linear-gradient(135deg, #f3efff 0%, #ebe4ff 100%); border: 2px solid #6d28d9; border-radius: 14px; padding: 18px 32px; margin-bottom: 28px;">
+                        <p style="margin: 0; font-size: 32px; font-weight: 700; letter-spacing: 10px; color: #3214a8; font-family: 'Courier New', monospace;">
+                          ${otp}
+                        </p>
+                      </div>
 
-            <h1 style="
-              margin: 0;
-              font-size: 26px;
-            ">
-              EVENTORA
-            </h1>
+                      <p style="margin: 0; font-size: 13px; color: #999; line-height: 1.6;">
+                        This code expires in <strong style="color: #666;">5 minutes</strong>.<br>
+                        If you didn’t request this, you can safely ignore this email.
+                      </p>
 
-            <p style="
-              margin: 5px 0 0;
-              font-size: 13px;
-            ">
-              Your Event, Your Experience
-            </p>
+                    </td>
+                  </tr>
 
-          </div>
+                  <!-- Footer -->
+                  <tr>
+                    <td style="background: #faf9ff; padding: 18px 28px; text-align: center; border-top: 1px solid #eeeaf8;">
+                      <p style="margin: 0; font-size: 12px; color: #999;">
+                        This is an automated email from Eventora.
+                      </p>
+                    </td>
+                  </tr>
 
+                </table>
 
-          <!-- OTP CONTENT -->
+              </td>
+            </tr>
+          </table>
 
-          <div style="
-            background: white;
-            padding: 30px 20px;
-            border-radius: 0 0 12px 12px;
-          ">
-
-            <h2 style="
-              color: #3214a8;
-              margin-top: 0;
-            ">
-              ${title}
-            </h2>
-
-
-            <p style="
-              color: #555;
-              font-size: 15px;
-              line-height: 1.6;
-            ">
-              ${msg}
-            </p>
-
-
-            <!-- OTP -->
-
-            <div style="
-              display: inline-block;
-              margin: 25px auto;
-              padding: 15px 25px;
-              background: #f3efff;
-              border: 2px solid #6d28d9;
-              border-radius: 10px;
-              font-size: 28px;
-              font-weight: bold;
-              letter-spacing: 7px;
-              color: #3214a8;
-            ">
-              ${otp}
-            </div>
-
-
-            <p style="
-              color: #999;
-              font-size: 12px;
-              line-height: 1.5;
-            ">
-              This code expires in 5 minutes.
-              If you didn't request this, please ignore this email.
-            </p>
-
-          </div>
-
-        </div>
+        </body>
+        </html>
       `,
     };
 
-
     await transporter.sendMail(mailOptions);
-
-
-    console.log(
-      `OTP sent to ${userEmail} for ${type}`
-    );
-
+    console.log(`OTP sent to ${userEmail} for ${type}`);
   } catch (error) {
-
-    console.error(
-      "Error sending OTP email:",
-      error
-    );
-
+    console.error("Error sending OTP email:", error);
     // OTP behavior remains unchanged.
     // Email failure does not crash the request.
   }
 };
 
-
 // ======================================================
 // EXPORTS
 // ======================================================
 
-export {
-  sendBookingEmail,
-  sendOTPEmail,
-};
+export { sendBookingEmail, sendOTPEmail };
