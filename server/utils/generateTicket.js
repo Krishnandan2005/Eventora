@@ -15,9 +15,7 @@ const TICKET_HEIGHT = 140 * MM;
 // GAP BETWEEN FRONT AND BACK
 const GAP = 5 * MM;
 
-// Center both tickets on A5
 const TOTAL_WIDTH = TICKET_WIDTH * 2 + GAP;
-
 const START_X = (PAGE_WIDTH - TOTAL_WIDTH) / 2;
 
 const FRONT_X = START_X;
@@ -26,29 +24,23 @@ const BACK_X = START_X + TICKET_WIDTH + GAP;
 const TICKET_Y = (PAGE_HEIGHT - TICKET_HEIGHT) / 2;
 
 // ======================================================
-// COLORS
+// BRAND COLORS — matches the Eventora web app
+// (near-black navbar, white content, indigo/green accents)
 // ======================================================
 
 const COLORS = {
     white: rgb(1, 1, 1),
     black: rgb(0.04, 0.05, 0.12),
-    dark: rgb(0.03, 0.02, 0.16),
+    navy: rgb(0.05, 0.06, 0.14), // header/footer bar, same family as the web navbar
 
-    purple: rgb(0.31, 0.10, 0.85),
-    purpleDark: rgb(0.12, 0.05, 0.35),
-    purpleLight: rgb(0.45, 0.20, 1),
+    accent: rgb(0.42, 0.36, 0.95), // indigo — ticket icon, links, dividers
+    accentPink: rgb(0.93, 0.28, 0.55),
+    accentAmber: rgb(1, 0.66, 0.15),
 
-    pink: rgb(0.95, 0.05, 0.55),
-    orange: rgb(1, 0.55, 0.05),
-
-    green: rgb(0.02, 0.75, 0.35),
-    blue: rgb(0.10, 0.35, 0.95),
-
-    lightBg: rgb(0.98, 0.97, 1),
-    lightPurple: rgb(0.94, 0.90, 1),
-
-    gray: rgb(0.40, 0.40, 0.48),
-    lightGray: rgb(0.86, 0.85, 0.92),
+    green: rgb(0.09, 0.72, 0.4), // CONFIRMED pill, matches dashboard green
+    gray: rgb(0.42, 0.42, 0.5),
+    lightGray: rgb(0.87, 0.86, 0.93),
+    lightBg: rgb(0.97, 0.97, 0.99),
 
     cutLine: rgb(0.72, 0.72, 0.78),
 };
@@ -58,176 +50,58 @@ const COLORS = {
 // ======================================================
 
 const safeText = (value) => {
-    if (value === null || value === undefined) {
-        return "";
-    }
-
-    return String(value)
-        .replace(/[^\x20-\x7E]/g, "")
-        .trim();
+    if (value === null || value === undefined) return "";
+    return String(value).replace(/[^\x20-\x7E]/g, "").trim();
 };
-
-// ======================================================
-// FORMAT DATE
-// ======================================================
 
 const formatDate = (dateValue) => {
     if (!dateValue) return "N/A";
-
     const date = new Date(dateValue);
-
-    if (Number.isNaN(date.getTime())) {
-        return safeText(dateValue);
-    }
-
-    return date.toLocaleDateString("en-GB", {
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
-    }).toUpperCase();
+    if (Number.isNaN(date.getTime())) return safeText(dateValue);
+    return date
+        .toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })
+        .toUpperCase();
 };
 
-// ======================================================
-// FORMAT PRICE
-// ======================================================
-
 const formatPrice = (price) => {
-    if (price === undefined || price === null || price === "") {
-        return "FREE";
-    }
-
+    if (price === undefined || price === null || price === "") return "FREE";
     const number = Number(price);
-
-    if (Number.isNaN(number)) {
-        return safeText(price);
-    }
-
+    if (Number.isNaN(number)) return safeText(price);
     return `INR ${number}`;
 };
 
-// ======================================================
-// FETCH EVENT IMAGE
-// ======================================================
-
 const fetchImage = async (imageUrl) => {
-    if (!imageUrl) {
-        return null;
-    }
-
+    if (!imageUrl) return null;
     try {
         const response = await fetch(imageUrl);
-
         if (!response.ok) {
-            console.error(
-                "Unable to fetch event image:",
-                response.status,
-                response.statusText
-            );
-
+            console.error("Unable to fetch event image:", response.status, response.statusText);
             return null;
         }
-
         const arrayBuffer = await response.arrayBuffer();
-
         return Buffer.from(arrayBuffer);
     } catch (error) {
         console.error("Event image fetch failed:", error.message);
-
         return null;
     }
 };
 
 // ======================================================
-// DRAW GRADIENT-LIKE BACKGROUND
+// SHAPE HELPERS
 // ======================================================
 
-const drawPurpleBackground = (page, x, y, width, height) => {
-    page.drawRectangle({
-        x,
-        y,
-        width,
-        height,
-        color: COLORS.purpleDark,
-    });
-
-    page.drawRectangle({
-        x: x + width * 0.25,
-        y,
-        width: width * 0.75,
-        height,
-        color: COLORS.purple,
-        opacity: 0.45,
-    });
-
-    page.drawRectangle({
-        x: x + width * 0.60,
-        y,
-        width: width * 0.40,
-        height,
-        color: COLORS.purpleLight,
-        opacity: 0.18,
-    });
-};
-
-// ======================================================
-// DRAW ROUNDED RECTANGLE
-// ======================================================
-
-const roundedRect = (
-    page,
-    x,
-    y,
-    width,
-    height,
-    color,
-    radius = 4,
-    borderColor = undefined,
-    borderWidth = 0
-) => {
-    page.drawRectangle({
-        x: x + radius,
-        y,
-        width: width - radius * 2,
-        height,
-        color,
-        borderColor,
-        borderWidth,
-    });
-
-    page.drawRectangle({
-        x,
-        y: y + radius,
-        width,
-        height: height - radius * 2,
-        color,
-        borderColor,
-        borderWidth,
-    });
-
+const roundedRect = (page, x, y, width, height, color, radius = 4, borderColor = undefined, borderWidth = 0) => {
+    page.drawRectangle({ x: x + radius, y, width: width - radius * 2, height, color, borderColor, borderWidth });
+    page.drawRectangle({ x, y: y + radius, width, height: height - radius * 2, color, borderColor, borderWidth });
     page.drawCircle({ x: x + radius, y: y + radius, size: radius, color });
     page.drawCircle({ x: x + width - radius, y: y + radius, size: radius, color });
     page.drawCircle({ x: x + radius, y: y + height - radius, size: radius, color });
     page.drawCircle({ x: x + width - radius, y: y + height - radius, size: radius, color });
 };
 
-// ======================================================
-// TEXT HELPER
-// ======================================================
-
-const drawText = (
-    page,
-    text,
-    x,
-    y,
-    size,
-    font,
-    color = COLORS.black,
-    options = {}
-) => {
+const drawText = (page, text, x, y, size, font, color = COLORS.black, options = {}) => {
     const value = safeText(text);
-
     if (!value) return;
-
     page.drawText(value, { x, y, size, font, color, ...options });
 };
 
@@ -238,39 +112,53 @@ const drawCenteredText = (page, text, centerX, y, size, font, color) => {
     drawText(page, value, centerX - width / 2, y, size, font, color);
 };
 
-// ======================================================
-// WRAP TEXT
-// ======================================================
-
 const wrapText = (text, font, size, maxWidth) => {
     const words = safeText(text).split(/\s+/);
-
     const lines = [];
     let currentLine = "";
-
     for (const word of words) {
         const testLine = currentLine ? `${currentLine} ${word}` : word;
-        const width = font.widthOfTextAtSize(testLine, size);
-
-        if (width <= maxWidth) {
+        if (font.widthOfTextAtSize(testLine, size) <= maxWidth) {
             currentLine = testLine;
         } else {
             if (currentLine) lines.push(currentLine);
             currentLine = word;
         }
     }
-
     if (currentLine) lines.push(currentLine);
-
     return lines;
 };
 
-// ======================================================
-// SMALL CHECKMARK ICON (used instead of plain "OK" text)
-// ======================================================
+// Small filled dot used as a bullet in front of labels
+const drawDot = (page, x, y, radius, color) => {
+    page.drawCircle({ x, y, size: radius, color });
+};
+
+// A recognizable "ticket stub" glyph: rounded pill with two notches
+// cut into the left/right edges and a perforation line — used as
+// the Eventora logo mark instead of a plain letter badge.
+const drawTicketIcon = (page, x, y, size, fillColor, cutColor) => {
+    const w = size * 1.5;
+    const h = size;
+
+    roundedRect(page, x, y, w, h, fillColor, size * 0.28);
+
+    drawDot(page, x, y + h / 2, size * 0.22, cutColor);
+    drawDot(page, x + w, y + h / 2, size * 0.22, cutColor);
+
+    const dashX = x + w * 0.6;
+    for (let dy = h * 0.16; dy < h * 0.84; dy += h * 0.24) {
+        page.drawRectangle({
+            x: dashX - size * 0.035,
+            y: y + dy,
+            width: size * 0.07,
+            height: size * 0.1,
+            color: cutColor,
+        });
+    }
+};
 
 const drawCheckmark = (page, centerX, centerY, size, color) => {
-    // A simple two-stroke check, scaled to `size`
     page.drawLine({
         start: { x: centerX - size * 0.5, y: centerY },
         end: { x: centerX - size * 0.12, y: centerY - size * 0.4 },
@@ -278,7 +166,6 @@ const drawCheckmark = (page, centerX, centerY, size, color) => {
         color,
         lineCap: "Round",
     });
-
     page.drawLine({
         start: { x: centerX - size * 0.12, y: centerY - size * 0.4 },
         end: { x: centerX + size * 0.55, y: centerY + size * 0.45 },
@@ -289,18 +176,45 @@ const drawCheckmark = (page, centerX, centerY, size, color) => {
 };
 
 // ======================================================
+// BRAND HEADER — reused on both the front and back so the
+// two halves read as one consistent, professional design
+// ======================================================
+
+const drawBrandHeader = (page, fonts, x, y, rightLabel, rightLabelColor) => {
+    const { bold } = fonts;
+    const headerH = 12 * MM;
+    const topY = y + TICKET_HEIGHT - headerH;
+
+    page.drawRectangle({ x, y: topY, width: TICKET_WIDTH, height: headerH, color: COLORS.navy });
+
+    drawTicketIcon(page, x + 6 * MM, topY + 3.7 * MM, 4.6 * MM, COLORS.accent, COLORS.navy);
+
+    drawText(page, "EVENTORA", x + 17 * MM, topY + 4 * MM, 4.6 * MM, bold, COLORS.white);
+
+    if (rightLabel) {
+        const pillW = bold.widthOfTextAtSize(rightLabel, 2.7 * MM) + 8 * MM;
+        const pillX = x + TICKET_WIDTH - pillW - 6 * MM;
+        const pillY = topY + 3 * MM;
+
+        roundedRect(page, pillX, pillY, pillW, 6 * MM, rightLabelColor, 3);
+        drawCenteredText(page, rightLabel, pillX + pillW / 2, pillY + 2.1 * MM, 2.7 * MM, bold, COLORS.white);
+    }
+
+    return topY; // bottom edge of the header, in absolute PDF units
+};
+
+// ======================================================
 // EVENT IMAGE
 // ======================================================
 
 const drawEventImage = async (page, imageBytes, x, y, width, height, pdfDoc) => {
     if (!imageBytes) {
-        page.drawRectangle({ x, y, width, height, color: COLORS.purpleDark });
+        page.drawRectangle({ x, y, width, height, color: COLORS.navy });
         return;
     }
 
     try {
         let image;
-
         if (imageBytes[0] === 0xff && imageBytes[1] === 0xd8) {
             image = await pdfDoc.embedJpg(imageBytes);
         } else {
@@ -326,50 +240,14 @@ const drawEventImage = async (page, imageBytes, x, y, width, height, pdfDoc) => 
 
         page.drawImage(image, { x: drawX, y: drawY, width: drawWidth, height: drawHeight });
 
-        // Darker overlay at the bottom for legible white title text,
-        // lighter towards the top so the image itself still reads clearly.
-        page.drawRectangle({
-            x,
-            y,
-            width,
-            height,
-            color: COLORS.dark,
-            opacity: 0.34,
-        });
-
-        page.drawRectangle({
-            x,
-            y,
-            width,
-            height: height * 0.55,
-            color: COLORS.dark,
-            opacity: 0.28,
-        });
+        // Gentle full-image tint plus a stronger gradient-like darkening
+        // toward the bottom, so the overlaid white title stays legible
+        // without flattening the photo itself.
+        page.drawRectangle({ x, y, width, height, color: COLORS.black, opacity: 0.12 });
+        page.drawRectangle({ x, y, width, height: height * 0.5, color: COLORS.black, opacity: 0.45 });
     } catch (error) {
         console.error("Could not embed event image:", error.message);
-        page.drawRectangle({ x, y, width, height, color: COLORS.purpleDark });
-    }
-};
-
-// ======================================================
-// DECORATIVE WAVE / DIVIDER STRIP
-// ======================================================
-
-const drawWave = (page, x, y, width, height) => {
-    const points = 32;
-
-    for (let i = 0; i < points; i++) {
-        const px = x + (width / points) * i;
-        const wave = Math.sin(i * 0.55) * height * 0.35;
-
-        page.drawRectangle({
-            x: px,
-            y: y + wave,
-            width: width / points + 1,
-            height: height * 0.45,
-            color: i < points / 2 ? COLORS.pink : COLORS.orange,
-            opacity: 0.9,
-        });
+        page.drawRectangle({ x, y, width, height, color: COLORS.navy });
     }
 };
 
@@ -379,211 +257,162 @@ const drawWave = (page, x, y, width, height) => {
 
 const drawFrontTicket = async (page, pdfDoc, fonts, booking, event, imageBytes) => {
     const { regular, bold } = fonts;
-
     const x = FRONT_X;
     const y = TICKET_Y;
 
-    // ------------------------------------------
-    // OUTER CARD
-    // ------------------------------------------
+    // Outer card — border matches the header color so the top corners
+    // read as cleanly rounded rather than showing a seam.
+    roundedRect(page, x, y, TICKET_WIDTH, TICKET_HEIGHT, COLORS.white, 5, COLORS.navy, 1);
 
-    roundedRect(page, x, y, TICKET_WIDTH, TICKET_HEIGHT, COLORS.white, 5, COLORS.purpleDark, 1);
+    // ---- Header (0mm–12mm from top) ----
+    drawBrandHeader(page, fonts, x, y, "CONFIRMED", COLORS.green);
 
-    // ------------------------------------------
-    // TOP PURPLE SECTION
-    // ------------------------------------------
+    // ---- Event image (12mm–56mm from top) ----
+    const imageX = x + 4 * MM;
+    const imageY = y + TICKET_HEIGHT - 56 * MM;
+    const imageWidth = TICKET_WIDTH - 8 * MM;
+    const imageHeight = 44 * MM;
 
-    const topHeight = 83 * MM;
+    await drawEventImage(page, imageBytes, imageX, imageY, imageWidth, imageHeight, pdfDoc);
 
-    drawPurpleBackground(page, x, y + TICKET_HEIGHT - topHeight, TICKET_WIDTH, topHeight);
+    // EVENT category pill, overlaid top-left of the image
+    const category = safeText(event?.category) || "General";
+    const catPillW = bold.widthOfTextAtSize(category.toUpperCase(), 2.6 * MM) + 8 * MM;
 
-    // ------------------------------------------
-    // BRAND ROW (logo + name) — from top: 4mm–18mm
-    // ------------------------------------------
-
-    page.drawCircle({
-        x: x + 12 * MM,
-        y: y + TICKET_HEIGHT - 12 * MM,
-        size: 6 * MM,
-        color: COLORS.purpleLight,
-    });
-
-    drawText(page, "E", x + 10.1 * MM, y + TICKET_HEIGHT - 14 * MM, 6 * MM, bold, COLORS.white);
-
-    drawText(page, "EVENTORA", x + 21 * MM, y + TICKET_HEIGHT - 11 * MM, 6.2 * MM, bold, COLORS.white);
-
+    roundedRect(page, x + 7 * MM, y + TICKET_HEIGHT - 22 * MM, catPillW, 6.4 * MM, COLORS.accent, 3);
     drawText(
         page,
-        "Your Event, Your Experience",
-        x + 21 * MM,
-        y + TICKET_HEIGHT - 16 * MM,
-        2.5 * MM,
-        regular,
-        rgb(0.78, 0.75, 1)
-    );
-
-    // ------------------------------------------
-    // BADGE ROW — EVENT (left) + CONFIRMED (right)
-    // Both share the same row so nothing overlaps
-    // the brand row above them. From top: 22mm–29mm
-    // ------------------------------------------
-
-    const badgeY = y + TICKET_HEIGHT - 29 * MM;
-    const badgeH = 7 * MM;
-
-    roundedRect(page, x + 7 * MM, badgeY, 18 * MM, badgeH, COLORS.purpleLight, 2);
-    drawText(page, "EVENT", x + 10 * MM, badgeY + 2.5 * MM, 2.8 * MM, bold, COLORS.white);
-
-    roundedRect(page, x + TICKET_WIDTH - 39 * MM, badgeY, 32 * MM, badgeH, COLORS.green, 2);
-    drawText(
-        page,
-        "CONFIRMED",
-        x + TICKET_WIDTH - 34.5 * MM,
-        badgeY + 2.5 * MM,
-        2.8 * MM,
+        category.toUpperCase(),
+        x + 11 * MM,
+        y + TICKET_HEIGHT - 19.8 * MM,
+        2.6 * MM,
         bold,
         COLORS.white
     );
 
-    // ------------------------------------------
-    // EVENT IMAGE — sits behind the title, from
-    // top: 20mm–55mm (35mm tall)
-    // ------------------------------------------
-
-    const imageX = x + 4 * MM;
-    const imageY = y + TICKET_HEIGHT - 55 * MM;
-    const imageWidth = TICKET_WIDTH - 8 * MM;
-    const imageHeight = 35 * MM;
-
-    await drawEventImage(page, imageBytes, imageX, imageY, imageWidth, imageHeight, pdfDoc);
-
-    // ------------------------------------------
-    // EVENT TITLE — overlaid on the image, from
-    // top: 33mm, up to 3 lines
-    // ------------------------------------------
-
+    // Event title, overlaid on the darkened lower portion of the image
     const title = safeText(event?.title);
-    const titleSize = 5.4 * MM;
-    const titleLines = wrapText(title, bold, titleSize, TICKET_WIDTH - 14 * MM);
+    const titleSize = 5.2 * MM;
+    const titleLines = wrapText(title, bold, titleSize, imageWidth - 4 * MM).slice(0, 2);
 
-    let titleY = y + TICKET_HEIGHT - 33 * MM;
+    let titleY =
+        titleLines.length > 1 ? y + TICKET_HEIGHT - 45.5 * MM : y + TICKET_HEIGHT - 49 * MM;
 
-    for (const line of titleLines.slice(0, 3)) {
+    for (const line of titleLines) {
         drawText(page, line, x + 7 * MM, titleY, titleSize, bold, COLORS.white);
-        titleY -= 6.6 * MM;
+        titleY -= 6.5 * MM;
     }
 
-    // ------------------------------------------
-    // DIVIDER STRIP — decorative, sits cleanly
-    // below the image (from top: ~58mm–62mm)
-    // ------------------------------------------
+    // ---- Two-tone accent strip (56mm–58mm from top) ----
+    page.drawRectangle({
+        x,
+        y: y + TICKET_HEIGHT - 58 * MM,
+        width: TICKET_WIDTH * 0.65,
+        height: 2 * MM,
+        color: COLORS.accent,
+    });
+    page.drawRectangle({
+        x: x + TICKET_WIDTH * 0.65,
+        y: y + TICKET_HEIGHT - 58 * MM,
+        width: TICKET_WIDTH * 0.35,
+        height: 2 * MM,
+        color: COLORS.accentPink,
+    });
 
-    drawWave(page, x, y + TICKET_HEIGHT - 60 * MM, TICKET_WIDTH, 5 * MM);
-
-    // ------------------------------------------
-    // DATE + LOCATION — from top: 65mm–74mm,
-    // safely above the details card below it
-    // ------------------------------------------
-
+    // ---- Date / Location row (62mm–71mm from top) ----
     const date = formatDate(event?.date);
     const location = safeText(event?.location);
 
-    const dividerTopY = y + TICKET_HEIGHT - 63 * MM;
-    const dividerBottomY = y + TICKET_HEIGHT - 74 * MM;
-
     page.drawLine({
-        start: { x: x + TICKET_WIDTH / 2, y: dividerTopY },
-        end: { x: x + TICKET_WIDTH / 2, y: dividerBottomY },
+        start: { x: x + TICKET_WIDTH / 2, y: y + TICKET_HEIGHT - 60 * MM },
+        end: { x: x + TICKET_WIDTH / 2, y: y + TICKET_HEIGHT - 72 * MM },
         thickness: 0.5,
-        color: rgb(0.65, 0.5, 1),
-    });
-
-    drawText(page, "DATE", x + 7 * MM, y + TICKET_HEIGHT - 65 * MM, 2.5 * MM, bold, rgb(0.75, 0.6, 1));
-    drawText(page, date, x + 7 * MM, y + TICKET_HEIGHT - 70 * MM, 3.4 * MM, bold, COLORS.white);
-
-    drawText(
-        page,
-        "LOCATION",
-        x + TICKET_WIDTH / 2 + 7 * MM,
-        y + TICKET_HEIGHT - 65 * MM,
-        2.5 * MM,
-        bold,
-        rgb(0.75, 0.6, 1)
-    );
-
-    const locationLines = wrapText(location, bold, 3 * MM, TICKET_WIDTH / 2 - 10 * MM);
-    let locationY = y + TICKET_HEIGHT - 70 * MM;
-
-    for (const line of locationLines.slice(0, 2)) {
-        drawText(page, line, x + TICKET_WIDTH / 2 + 7 * MM, locationY, 3 * MM, bold, COLORS.white);
-        locationY -= 4 * MM;
-    }
-
-    // ------------------------------------------
-    // TICKET DETAILS CARD (floats slightly over
-    // the purple header, from-bottom: 7mm–65mm)
-    // ------------------------------------------
-
-    const detailsY = y + 7 * MM;
-    const detailsHeight = 58 * MM;
-
-    roundedRect(page, x, detailsY, TICKET_WIDTH, detailsHeight, COLORS.lightBg, 5, COLORS.lightGray, 0.5);
-
-    drawText(page, "TICKET DETAILS", x + 7 * MM, detailsY + detailsHeight - 9 * MM, 4 * MM, bold, COLORS.purple);
-
-    page.drawLine({
-        start: { x: x + 7 * MM, y: detailsY + detailsHeight - 12 * MM },
-        end: { x: x + TICKET_WIDTH - 7 * MM, y: detailsY + detailsHeight - 12 * MM },
-        thickness: 0.7,
         color: COLORS.lightGray,
     });
 
-    const boxX = x + 5 * MM;
-    const boxY = detailsY + 16 * MM;
-    const boxW = TICKET_WIDTH - 10 * MM;
-    const boxH = 33 * MM;
+    drawDot(page, x + 8 * MM, y + TICKET_HEIGHT - 62.7 * MM, 0.7 * MM, COLORS.accent);
+    drawText(page, "DATE", x + 10.5 * MM, y + TICKET_HEIGHT - 63.5 * MM, 2.4 * MM, bold, COLORS.gray);
+    drawText(page, date, x + 7 * MM, y + TICKET_HEIGHT - 68.5 * MM, 3.4 * MM, bold, COLORS.black);
+
+    drawDot(page, x + TICKET_WIDTH / 2 + 8 * MM, y + TICKET_HEIGHT - 62.7 * MM, 0.7 * MM, COLORS.accentPink);
+    drawText(
+        page,
+        "LOCATION",
+        x + TICKET_WIDTH / 2 + 10.5 * MM,
+        y + TICKET_HEIGHT - 63.5 * MM,
+        2.4 * MM,
+        bold,
+        COLORS.gray
+    );
+
+    const locationLines = wrapText(location, bold, 3 * MM, TICKET_WIDTH / 2 - 14 * MM).slice(0, 2);
+    let locationY = y + TICKET_HEIGHT - 68.5 * MM;
+    for (const line of locationLines) {
+        drawText(page, line, x + TICKET_WIDTH / 2 + 7 * MM, locationY, 3 * MM, bold, COLORS.black);
+        locationY -= 3.8 * MM;
+    }
+
+    // ---- "Ticket details" panel (78mm–134mm from top) ----
+    const panelY = y + 6 * MM;
+    const panelHeight = 56 * MM;
+
+    roundedRect(page, x + 4 * MM, panelY, TICKET_WIDTH - 8 * MM, panelHeight, COLORS.lightBg, 5, COLORS.lightGray, 0.5);
+
+    drawText(page, "TICKET DETAILS", x + 9 * MM, y + TICKET_HEIGHT - 84 * MM, 3.6 * MM, bold, COLORS.accent);
+
+    page.drawLine({
+        start: { x: x + 9 * MM, y: y + TICKET_HEIGHT - 87 * MM },
+        end: { x: x + TICKET_WIDTH - 9 * MM, y: y + TICKET_HEIGHT - 87 * MM },
+        thickness: 0.6,
+        color: COLORS.lightGray,
+    });
+
+    const boxX = x + 7 * MM;
+    const boxY = y + 17 * MM;
+    const boxW = TICKET_WIDTH - 14 * MM;
+    const boxH = 32 * MM;
 
     roundedRect(page, boxX, boxY, boxW, boxH, COLORS.white, 4, COLORS.lightGray, 0.6);
 
     const attendeeName = safeText(booking?.userId?.name) || "Guest";
     const email = safeText(booking?.userId?.email);
-    const category = safeText(event?.category) || "General";
     const price = formatPrice(event?.ticketPrice);
 
-    const leftX = boxX + 7 * MM;
+    const leftX = boxX + 6 * MM;
     const rightX = boxX + boxW / 2 + 3 * MM;
 
-    drawText(page, "ATTENDEE", leftX, boxY + 26 * MM, 2.1 * MM, bold, COLORS.gray);
-    drawText(page, attendeeName, leftX, boxY + 21.5 * MM, 3.1 * MM, bold, COLORS.black);
+    drawText(page, "ATTENDEE", leftX, boxY + boxH - 6 * MM, 2.1 * MM, bold, COLORS.gray);
+    drawText(page, attendeeName, leftX, boxY + boxH - 10.5 * MM, 3.1 * MM, bold, COLORS.black);
 
-    drawText(page, "DATE", leftX, boxY + 14 * MM, 2.1 * MM, bold, COLORS.gray);
-    drawText(page, date, leftX, boxY + 9.5 * MM, 3.1 * MM, bold, COLORS.black);
+    drawText(page, "DATE", leftX, boxY + boxH - 18 * MM, 2.1 * MM, bold, COLORS.gray);
+    drawText(page, date, leftX, boxY + boxH - 22.5 * MM, 3.1 * MM, bold, COLORS.black);
 
-    drawText(page, "LOCATION", rightX, boxY + 26 * MM, 2.1 * MM, bold, COLORS.gray);
-
-    const locLines = wrapText(location, bold, 2.8 * MM, boxW / 2 - 8 * MM);
-    let locY = boxY + 21.5 * MM;
-
-    for (const line of locLines.slice(0, 2)) {
+    drawText(page, "LOCATION", rightX, boxY + boxH - 6 * MM, 2.1 * MM, bold, COLORS.gray);
+    const locLines = wrapText(location, bold, 2.8 * MM, boxW / 2 - 8 * MM).slice(0, 2);
+    let locY = boxY + boxH - 10.5 * MM;
+    for (const line of locLines) {
         drawText(page, line, rightX, locY, 2.8 * MM, bold, COLORS.black);
-        locY -= 3.7 * MM;
+        locY -= 3.6 * MM;
     }
 
-    drawText(page, "CATEGORY", rightX, boxY + 10 * MM, 2.1 * MM, bold, COLORS.gray);
-    drawText(page, category, rightX, boxY + 5.5 * MM, 2.8 * MM, bold, COLORS.black);
+    drawText(page, "CATEGORY", rightX, boxY + boxH - 22 * MM, 2.1 * MM, bold, COLORS.gray);
+    drawText(page, category, rightX, boxY + boxH - 26.5 * MM, 2.8 * MM, bold, COLORS.black);
 
-    drawText(page, "TICKET PRICE", leftX, detailsY + 11 * MM, 2.1 * MM, bold, COLORS.gray);
-    drawText(page, price, leftX, detailsY + 6.5 * MM, 3.2 * MM, bold, COLORS.purple);
+    // PRICE / EMAIL, below the box, still inside the panel
+    drawDot(page, leftX, y + TICKET_HEIGHT - 128.5 * MM, 1 * MM, COLORS.green);
+    drawText(page, "TICKET PRICE", leftX + 3 * MM, y + TICKET_HEIGHT - 127 * MM, 2.1 * MM, bold, COLORS.gray);
+    drawText(page, price, leftX, y + TICKET_HEIGHT - 132 * MM, 3.4 * MM, bold, COLORS.accent);
 
-    drawText(page, "EMAIL", rightX, detailsY + 11 * MM, 2.1 * MM, bold, COLORS.gray);
-
-    const emailLines = wrapText(email, regular, 2.3 * MM, boxW / 2 - 8 * MM);
-    let emailY = detailsY + 6.5 * MM;
-
-    for (const line of emailLines.slice(0, 2)) {
+    drawText(page, "EMAIL", rightX, y + TICKET_HEIGHT - 127 * MM, 2.1 * MM, bold, COLORS.gray);
+    const emailLines = wrapText(email, regular, 2.3 * MM, boxW / 2 - 8 * MM).slice(0, 2);
+    let emailY = y + TICKET_HEIGHT - 132 * MM;
+    for (const line of emailLines) {
         drawText(page, line, rightX, emailY, 2.3 * MM, regular, COLORS.black);
         emailY -= 3.2 * MM;
     }
+
+    // Footer micro-text
+    drawCenteredText(page, "Please carry a valid photo ID to the venue", x + TICKET_WIDTH / 2, y + TICKET_HEIGHT - 137 * MM, 2 * MM, regular, COLORS.gray);
 };
 
 // ======================================================
@@ -592,75 +421,35 @@ const drawFrontTicket = async (page, pdfDoc, fonts, booking, event, imageBytes) 
 
 const drawBackTicket = async (page, pdfDoc, fonts, booking, event) => {
     const { regular, bold } = fonts;
-
     const x = BACK_X;
     const y = TICKET_Y;
 
-    roundedRect(page, x, y, TICKET_WIDTH, TICKET_HEIGHT, COLORS.white, 5, COLORS.purpleDark, 1);
+    roundedRect(page, x, y, TICKET_WIDTH, TICKET_HEIGHT, COLORS.white, 5, COLORS.navy, 1);
 
-    page.drawRectangle({
-        x,
-        y: y + TICKET_HEIGHT - 3 * MM,
-        width: TICKET_WIDTH,
-        height: 3 * MM,
-        color: COLORS.lightPurple,
-    });
+    // ---- Header, mirrors the front for a consistent bookend look ----
+    drawBrandHeader(page, fonts, x, y, "E-TICKET", COLORS.accent);
 
-    // ------------------------------------------
-    // CHECK BADGE + HEADER
-    // ------------------------------------------
-
+    // ---- Verification badge + copy (16mm–52mm from top) ----
     page.drawCircle({
         x: x + TICKET_WIDTH / 2,
-        y: y + TICKET_HEIGHT - 21 * MM,
+        y: y + TICKET_HEIGHT - 24 * MM,
         size: 8 * MM,
-        color: COLORS.lightPurple,
+        color: COLORS.lightBg,
     });
+    drawCheckmark(page, x + TICKET_WIDTH / 2, y + TICKET_HEIGHT - 24 * MM, 5 * MM, COLORS.green);
 
-    drawCheckmark(page, x + TICKET_WIDTH / 2, y + TICKET_HEIGHT - 21 * MM, 5 * MM, COLORS.purple);
-
-    drawCenteredText(
-        page,
-        "SCAN TO VERIFY",
-        x + TICKET_WIDTH / 2,
-        y + TICKET_HEIGHT - 34 * MM,
-        5 * MM,
-        bold,
-        COLORS.purple
-    );
-
-    drawCenteredText(
-        page,
-        "Present this QR code at",
-        x + TICKET_WIDTH / 2,
-        y + TICKET_HEIGHT - 41 * MM,
-        3 * MM,
-        regular,
-        COLORS.black
-    );
-
-    drawCenteredText(
-        page,
-        "the event entrance.",
-        x + TICKET_WIDTH / 2,
-        y + TICKET_HEIGHT - 46 * MM,
-        3 * MM,
-        regular,
-        COLORS.black
-    );
+    drawCenteredText(page, "SCAN TO VERIFY", x + TICKET_WIDTH / 2, y + TICKET_HEIGHT - 38 * MM, 4.8 * MM, bold, COLORS.accent);
+    drawCenteredText(page, "Present this QR code at", x + TICKET_WIDTH / 2, y + TICKET_HEIGHT - 44 * MM, 2.8 * MM, regular, COLORS.gray);
+    drawCenteredText(page, "the event entrance.", x + TICKET_WIDTH / 2, y + TICKET_HEIGHT - 48.5 * MM, 2.8 * MM, regular, COLORS.gray);
 
     page.drawLine({
         start: { x: x + 10 * MM, y: y + TICKET_HEIGHT - 52 * MM },
         end: { x: x + TICKET_WIDTH - 10 * MM, y: y + TICKET_HEIGHT - 52 * MM },
         thickness: 0.8,
-        color: COLORS.lightPurple,
+        color: COLORS.lightGray,
     });
 
-    // ------------------------------------------
-    // QR CODE — sized and positioned so the
-    // booking ID below it never collides with it
-    // ------------------------------------------
-
+    // ---- QR code (56mm–104mm from top) ----
     const bookingId = booking?._id?.toString() || booking?.id?.toString() || "";
 
     const qrData = JSON.stringify({
@@ -671,100 +460,45 @@ const drawBackTicket = async (page, pdfDoc, fonts, booking, event) => {
     });
 
     try {
-        const qrDataUrl = await QRCode.toDataURL(qrData, {
-            width: 800,
-            margin: 2,
-            errorCorrectionLevel: "H",
-        });
-
-        const qrBase64 = qrDataUrl.split(",")[1];
-        const qrBytes = Buffer.from(qrBase64, "base64");
+        const qrDataUrl = await QRCode.toDataURL(qrData, { width: 800, margin: 1, errorCorrectionLevel: "H" });
+        const qrBytes = Buffer.from(qrDataUrl.split(",")[1], "base64");
         const qrImage = await pdfDoc.embedPng(qrBytes);
 
-        const qrSize = 35 * MM;
+        const qrSize = 40 * MM;
         const qrX = x + (TICKET_WIDTH - qrSize) / 2;
-        const qrY = y + 46 * MM;
+        const qrY = y + TICKET_HEIGHT - 104 * MM;
 
-        roundedRect(
-            page,
-            qrX - 4 * MM,
-            qrY - 4 * MM,
-            qrSize + 8 * MM,
-            qrSize + 8 * MM,
-            COLORS.white,
-            4,
-            COLORS.lightPurple,
-            0.8
-        );
-
+        roundedRect(page, qrX - 4 * MM, qrY - 4 * MM, qrSize + 8 * MM, qrSize + 8 * MM, COLORS.white, 4, COLORS.lightGray, 0.8);
         page.drawImage(qrImage, { x: qrX, y: qrY, width: qrSize, height: qrSize });
     } catch (error) {
         console.error("QR generation failed:", error.message);
     }
 
-    // ------------------------------------------
-    // BOOKING ID — below the QR card, clear of it
-    // ------------------------------------------
+    // ---- Booking ID, clear of the QR card below it ----
+    drawCenteredText(page, "BOOKING ID", x + TICKET_WIDTH / 2, y + TICKET_HEIGHT - 109 * MM, 2.3 * MM, bold, COLORS.gray);
+    drawCenteredText(page, bookingId.toUpperCase(), x + TICKET_WIDTH / 2, y + TICKET_HEIGHT - 114 * MM, 3.4 * MM, bold, COLORS.accent);
 
-    drawCenteredText(
-        page,
-        "BOOKING ID",
-        x + TICKET_WIDTH / 2,
-        y + 39 * MM,
-        2.4 * MM,
-        bold,
-        COLORS.gray
-    );
-
-    drawCenteredText(
-        page,
-        bookingId.toUpperCase(),
-        x + TICKET_WIDTH / 2,
-        y + 33 * MM,
-        3.4 * MM,
-        bold,
-        COLORS.purple
-    );
-
-    // ------------------------------------------
-    // DECORATIVE DIVIDER + BRAND FOOTER
-    // ------------------------------------------
-
-    page.drawRectangle({
-        x: x + 12 * MM,
-        y: y + 27 * MM,
-        width: TICKET_WIDTH - 24 * MM,
-        height: 0.6 * MM,
-        color: COLORS.lightPurple,
+    page.drawLine({
+        start: { x: x + 14 * MM, y: y + TICKET_HEIGHT - 120 * MM },
+        end: { x: x + TICKET_WIDTH - 14 * MM, y: y + TICKET_HEIGHT - 120 * MM },
+        thickness: 0.6,
+        color: COLORS.lightGray,
     });
 
-    drawCenteredText(page, "EVENTORA", x + TICKET_WIDTH / 2, y + 22 * MM, 4 * MM, bold, COLORS.purple);
-
-    drawCenteredText(
-        page,
-        "Your Event, Your Experience",
-        x + TICKET_WIDTH / 2,
-        y + 17 * MM,
-        2.3 * MM,
-        regular,
-        COLORS.gray
-    );
-
-    // ------------------------------------------
-    // SECURITY MESSAGE
-    // ------------------------------------------
-
-    roundedRect(page, x + 8 * MM, y + 3 * MM, TICKET_WIDTH - 16 * MM, 7 * MM, COLORS.lightPurple, 2);
-
+    // ---- Security note ----
+    roundedRect(page, x + 8 * MM, y + TICKET_HEIGHT - 131 * MM, TICKET_WIDTH - 16 * MM, 7 * MM, COLORS.lightBg, 2, COLORS.lightGray, 0.5);
     drawCenteredText(
         page,
         "Keep this ticket safe and do not share it.",
         x + TICKET_WIDTH / 2,
-        y + 5.5 * MM,
+        y + TICKET_HEIGHT - 127.5 * MM,
         2.1 * MM,
         bold,
-        COLORS.purpleDark
+        COLORS.gray
     );
+
+    // ---- Footer micro-text ----
+    drawCenteredText(page, "eventora.app", x + TICKET_WIDTH / 2, y + TICKET_HEIGHT - 137 * MM, 2 * MM, regular, COLORS.lightGray);
 };
 
 // ======================================================
@@ -782,14 +516,12 @@ const drawCutLine = (page) => {
 
     while (cursor > bottom) {
         const segmentEnd = Math.max(cursor - dashLength, bottom);
-
         page.drawLine({
             start: { x: centerX, y: cursor },
             end: { x: centerX, y: segmentEnd },
             thickness: 0.75,
             color: COLORS.cutLine,
         });
-
         cursor = segmentEnd - gapLength;
     }
 };
@@ -801,22 +533,18 @@ const drawCutLine = (page) => {
 export const generateTicketPDF = async (booking) => {
     try {
         const pdfDoc = await PDFDocument.create();
-
         const page = pdfDoc.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
 
         const regular = await pdfDoc.embedFont(StandardFonts.Helvetica);
         const bold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-
         const fonts = { regular, bold };
 
         const event = booking?.eventId;
-
         if (!event) {
             throw new Error("Event information is missing from booking");
         }
 
         const imageUrl = event.imageUrl || event.image || event.imageURL || "";
-
         console.log("Event image URL:", imageUrl);
 
         const imageBytes = await fetchImage(imageUrl);
@@ -826,7 +554,6 @@ export const generateTicketPDF = async (booking) => {
         drawCutLine(page);
 
         const pdfBytes = await pdfDoc.save();
-
         console.log("Eventora ticket PDF generated successfully");
 
         return Buffer.from(pdfBytes);
