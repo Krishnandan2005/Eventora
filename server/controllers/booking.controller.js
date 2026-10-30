@@ -11,40 +11,27 @@ import {
     generateTicketPDF,
 } from "../utils/generateTicket.js";
 
-
-// ======================================================
 // GENERATE OTP
-// ======================================================
-
 const generateOTP = () =>
-    Math.floor(
-        100000 + Math.random() * 900000
-    ).toString();
+    Math.floor(100000 + Math.random() * 900000).toString();
 
-
-// ======================================================
 // SEND BOOKING OTP
-// ======================================================
-
 export const sendBookingOTP = async (req, res) => {
     try {
-
         const otp = generateOTP();
 
-        // Remove previous booking OTP
-        await Otp.findOneAndDelete({
-            email: req.user.email,
-            action: "event_booking",
-        });
+        // Atomic upsert: replaces existing OTP or creates a new one in 1 DB call
+        await Otp.findOneAndUpdate(
+            {
+                email: req.user.email,
+                action: "event_booking",
+            },
+            {
+                $set: { otp, createdAt: new Date() },
+            },
+            { upsert: true, new: true }
+        );
 
-        // Create new OTP
-        await Otp.create({
-            email: req.user.email,
-            otp,
-            action: "event_booking",
-        });
-
-        // Send OTP email
         await sendOTPEmail(
             req.user.email,
             otp,
@@ -54,14 +41,8 @@ export const sendBookingOTP = async (req, res) => {
         res.json({
             message: "OTP sent successfully",
         });
-
     } catch (error) {
-
-        console.error(
-            "Send booking OTP error:",
-            error
-        );
-
+        console.error("Send booking OTP error:", error);
         res.status(500).json({
             message: "Error sending OTP",
             error: error.message,
@@ -69,119 +50,76 @@ export const sendBookingOTP = async (req, res) => {
     }
 };
 
-
-// ======================================================
 // BOOK EVENT
-// ======================================================
-
 export const bookEvent = async (req, res) => {
     try {
+        const { eventId, otp } = req.body;
 
-        const {
-            eventId,
-            otp,
-        } = req.body;
+        // 1. ATOMIC OTP VERIFICATION & CONSUMPTION (With Strict 5-Min Expiry)
+        // Prevents OTP replay attacks and enforces exact 5-minute expiration
+        const FIVE_MINUTES_AGO = new Date(Date.now() - 5 * 60 * 1000);
 
-        // ----------------------------------------------
-        // VERIFY OTP
-        // ----------------------------------------------
-
-        const validOTP = await Otp.findOne({
-            email: req.user.email,
+        const validOTP = await Otp.findOneAndDelete({
+            email: req.user.email.toLowerCase().trim(),
             otp,
             action: "event_booking",
+            createdAt: { $gt: FIVE_MINUTES_AGO },
         });
 
         if (!validOTP) {
             return res.status(400).json({
-                message:
-                    "Invalid or expired OTP for booking",
+                message: "Invalid or expired OTP for booking",
             });
         }
 
-
-        // ----------------------------------------------
-        // FIND EVENT
-        // ----------------------------------------------
-
-        const event =
-            await Event.findById(eventId);
+        // 2. CHECK EVENT & SEAT AVAILABILITY
+        const event = await Event.findOne({
+            _id: eventId,
+            availableSeats: { $gt: 0 },
+        });
 
         if (!event) {
-            return res.status(404).json({
-                message: "Event not found",
-            });
-        }
-
-
-        // ----------------------------------------------
-        // CHECK SEATS
-        // ----------------------------------------------
-
-        if (event.availableSeats <= 0) {
             return res.status(400).json({
-                message: "No seats available",
+                message: "Event not found or no seats available",
             });
         }
 
-
-        // ----------------------------------------------
-        // CHECK EXISTING BOOKING
-        // ----------------------------------------------
-
-        const existingBooking =
-            await Booking.findOne({
-                userId: req.user.id,
-                eventId,
-            });
-
-        if (
-            existingBooking &&
-            existingBooking.status !== "cancelled"
-        ) {
-            return res.status(400).json({
-                message:
-                    "Already booked or pending",
-            });
-        }
-
-
-        // ----------------------------------------------
-        // CREATE BOOKING
-        // ----------------------------------------------
-
-        const booking =
-            await Booking.create({
-                userId: req.user.id,
-                eventId,
-                status: "pending",
-                paymentStatus: "not_paid",
-                amount: event.ticketPrice,
-            });
-
-
-        // ----------------------------------------------
-        // DELETE USED OTP
-        // ----------------------------------------------
-
-        await Otp.deleteOne({
-            _id: validOTP._id,
+        // 3. CHECK DUPLICATE ACTIVE BOOKING
+        const existingActiveBooking = await Booking.findOne({
+            userId: req.user.id,
+            eventId,
+            status: { $ne: "cancelled" },
         });
 
+        if (existingActiveBooking) {
+            return res.status(400).json({
+                message: "Already booked or pending",
+            });
+        }
+
+        // 4. CREATE BOOKING
+        // Protected by Partial Unique Index in Booking.models.js against race conditions
+        const booking = await Booking.create({
+            userId: req.user.id,
+            eventId,
+            status: "pending",
+            paymentStatus: "not_paid",
+            amount: event.ticketPrice,
+        });
 
         res.status(201).json({
-            message:
-                "Booking request submitted",
+            message: "Booking request submitted",
             booking,
         });
-
     } catch (error) {
+        // Catch duplicate key error from Partial Unique Index if concurrent requests race
+        if (error.code === 11000) {
+            return res.status(400).json({
+                message: "Already booked or pending",
+            });
+        }
 
-        console.error(
-            "Book event error:",
-            error
-        );
-
+        console.error("Book event error:", error);
         res.status(500).json({
             message: "Server Error",
             error: error.message,
@@ -189,113 +127,61 @@ export const bookEvent = async (req, res) => {
     }
 };
 
-
-// ======================================================
-// CONFIRM BOOKING
-// ======================================================
-
+// CONFIRM BOOKING (ADMIN)
 export const confirmBooking = async (req, res) => {
     try {
+        const { paymentStatus } = req.body;
 
-        const {
-            paymentStatus,
-        } = req.body;
+        // 1. ATOMIC BOOKING STATE TRANSITION
+        // Only transitions if status is currently "pending".
+        // Prevents admin double-click from confirming the same booking twice.
+        const updateData = { status: "confirmed" };
+        if (paymentStatus) {
+            updateData.paymentStatus = paymentStatus;
+        }
 
-
-        // ----------------------------------------------
-        // GET BOOKING
-        // ----------------------------------------------
-
-        const booking =
-            await Booking.findById(req.params.id)
-                .populate("userId")
-                .populate("eventId");
-
+        const booking = await Booking.findOneAndUpdate(
+            {
+                _id: req.params.id,
+                status: { $nin: ["confirmed", "cancelled"] },
+            },
+            { $set: updateData },
+            { new: true }
+        )
+            .populate("userId")
+            .populate("eventId");
 
         if (!booking) {
-            return res.status(404).json({
-                message: "Booking not found",
-            });
-        }
-
-
-        // ----------------------------------------------
-        // CHECK ALREADY CONFIRMED
-        // ----------------------------------------------
-
-        if (booking.status === "confirmed") {
             return res.status(400).json({
-                message:
-                    "Booking is already confirmed",
+                message: "Booking not found, already confirmed, or cancelled",
             });
         }
 
+        // 2. ATOMIC SEAT DECREMENT
+        // Decrements availableSeats ONLY IF availableSeats > 0 in a single atomic operation.
+        const updatedEvent = await Event.findOneAndUpdate(
+            {
+                _id: booking.eventId._id,
+                availableSeats: { $gt: 0 },
+            },
+            { $inc: { availableSeats: -1 } },
+            { new: true }
+        );
 
-        // ----------------------------------------------
-        // GET EVENT
-        // ----------------------------------------------
-
-        const event =
-            await Event.findById(
-                booking.eventId._id
-            );
-
-
-        if (!event) {
-            return res.status(404).json({
-                message: "Event not found",
+        // COMPENSATING ROLLBACK: If the last seat was taken milliseconds ago by another confirmation,
+        // revert the booking status back to "pending" so the database stays consistent.
+        if (!updatedEvent) {
+            await Booking.findByIdAndUpdate(booking._id, {
+                $set: { status: "pending" },
             });
-        }
 
-
-        // ----------------------------------------------
-        // CHECK AVAILABLE SEATS
-        // ----------------------------------------------
-
-        if (event.availableSeats <= 0) {
             return res.status(400).json({
-                message:
-                    "No seats available to confirm this booking",
+                message: "No seats available to confirm this booking",
             });
         }
 
-
-        // ----------------------------------------------
-        // CONFIRM BOOKING
-        // ----------------------------------------------
-
-        booking.status = "confirmed";
-
-
-        if (paymentStatus) {
-            booking.paymentStatus =
-                paymentStatus;
-        }
-
-
-        await booking.save();
-
-
-        // ----------------------------------------------
-        // DECREASE AVAILABLE SEATS
-        // ----------------------------------------------
-
-        event.availableSeats -= 1;
-
-        await event.save();
-
-
-        // ----------------------------------------------
-        // GENERATE PDF TICKET
-        // ----------------------------------------------
-
-        const ticketBuffer =
-            await generateTicketPDF(booking);
-
-
-        // ----------------------------------------------
-        // SEND PDF THROUGH EMAIL
-        // ----------------------------------------------
+        // 3. GENERATE PDF TICKET & SEND EMAIL
+        const ticketBuffer = await generateTicketPDF(booking);
 
         await sendBookingEmail(
             booking.userId.email,
@@ -304,25 +190,12 @@ export const confirmBooking = async (req, res) => {
             ticketBuffer
         );
 
-
-        // ----------------------------------------------
-        // RESPONSE
-        // ----------------------------------------------
-
         res.json({
-            message:
-                "Booking confirmed and ticket sent successfully",
-
+            message: "Booking confirmed and ticket sent successfully",
             booking,
         });
-
     } catch (error) {
-
-        console.error(
-            "Confirm booking error:",
-            error
-        );
-
+        console.error("Confirm booking error:", error);
         res.status(500).json({
             message: "Server Error",
             error: error.message,
@@ -330,48 +203,22 @@ export const confirmBooking = async (req, res) => {
     }
 };
 
-
-// ======================================================
 // GET MY BOOKINGS
-// ======================================================
-
-export const getMyBookings = async (
-    req,
-    res
-) => {
+export const getMyBookings = async (req, res) => {
     try {
-
         const bookings =
             req.user.role === "admin"
-
                 ? await Booking.find()
-                    .populate("eventId")
-                    .populate(
-                        "userId",
-                        "name email"
-                    )
-                    .sort({
-                        createdAt: -1,
-                    })
-
-                : await Booking.find({
-                    userId: req.user.id,
-                })
-                    .populate("eventId")
-                    .sort({
-                        createdAt: -1,
-                    });
-
+                      .populate("eventId")
+                      .populate("userId", "name email")
+                      .sort({ createdAt: -1 })
+                : await Booking.find({ userId: req.user.id })
+                      .populate("eventId")
+                      .sort({ createdAt: -1 });
 
         res.json(bookings);
-
     } catch (error) {
-
-        console.error(
-            "Get bookings error:",
-            error
-        );
-
+        console.error("Get bookings error:", error);
         res.status(500).json({
             message: "Server Error",
             error: error.message,
@@ -379,110 +226,52 @@ export const getMyBookings = async (
     }
 };
 
-
-// ======================================================
 // CANCEL BOOKING
-// ======================================================
-
-export const cancelBooking = async (
-    req,
-    res
-) => {
+export const cancelBooking = async (req, res) => {
     try {
+        // 1. Build atomic filter combining ID, Authorization, and Status check
+        const filter = {
+            _id: req.params.id,
+            status: { $ne: "cancelled" }, // Prevents double-cancellation race condition
+        };
 
-        // ----------------------------------------------
-        // FIND BOOKING
-        // ----------------------------------------------
-
-        const booking =
-            await Booking.findById(
-                req.params.id
-            );
-
-
-        if (!booking) {
-            return res.status(404).json({
-                message: "Booking not found",
-            });
+        // If not admin, restrict query to only match the user's own booking
+        if (req.user.role !== "admin") {
+            filter.userId = req.user.id;
         }
 
-
-        // ----------------------------------------------
-        // AUTHORIZATION
-        // ----------------------------------------------
-
-        if (
-            booking.userId.toString() !==
-                req.user.id &&
-            req.user.role !== "admin"
-        ) {
-            return res.status(403).json({
-                message: "Not authorized",
-            });
-        }
-
-
-        // ----------------------------------------------
-        // ALREADY CANCELLED
-        // ----------------------------------------------
-
-        if (booking.status === "cancelled") {
-            return res.status(400).json({
-                message: "Already cancelled",
-            });
-        }
-
-
-        // ----------------------------------------------
-        // CHECK IF CONFIRMED
-        // ----------------------------------------------
-
-        const wasConfirmed =
-            booking.status === "confirmed";
-
-
-        // ----------------------------------------------
-        // CANCEL BOOKING
-        // ----------------------------------------------
-
-        booking.status = "cancelled";
-
-        await booking.save();
-
-
-        // ----------------------------------------------
-        // RESTORE SEAT
-        // ----------------------------------------------
-
-        if (wasConfirmed) {
-
-            const event =
-                await Event.findById(
-                    booking.eventId
-                );
-
-
-            if (event) {
-
-                event.availableSeats += 1;
-
-                await event.save();
-            }
-        }
-
-
-        res.json({
-            message:
-                "Booking cancelled successfully",
-        });
-
-    } catch (error) {
-
-        console.error(
-            "Cancel booking error:",
-            error
+        // 2. ATOMIC CANCEL & RETURN PREVIOUS DOCUMENT STATE
+        // { new: false } returns the document BEFORE the update, letting us know
+        // atomically whether its previous state was "confirmed" or "pending".
+        const previousBooking = await Booking.findOneAndUpdate(
+            filter,
+            { $set: { status: "cancelled" } },
+            { new: false }
         );
 
+        if (!previousBooking) {
+            return res.status(400).json({
+                message: "Booking not found, not authorized, or already cancelled",
+            });
+        }
+
+        // 3. ATOMIC SEAT RESTORATION
+        // Only increment seat if the booking was previously "confirmed"
+        if (previousBooking.status === "confirmed") {
+    await Event.findOneAndUpdate(
+        {
+            _id: previousBooking.eventId,
+            $expr: { $lt: ["$availableSeats", "$totalSeats"] }, // Ensures availableSeats < totalSeats
+        },
+        { $inc: { availableSeats: 1 } }
+    );
+}
+
+        res.json({
+            message: "Booking cancelled successfully",
+        });
+    } catch (error) {
+        console.error("Cancel booking error:", error);
         res.status(500).json({
             message: "Server Error",
             error: error.message,

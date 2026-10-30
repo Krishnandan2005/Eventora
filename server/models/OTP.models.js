@@ -4,7 +4,8 @@ const otpSchema = new mongoose.Schema({
     email: {
         type: String,
         required: true,
-        index: true,
+        lowercase: true,
+        trim: true,
     },
     otp: {
         type: String,
@@ -12,15 +13,20 @@ const otpSchema = new mongoose.Schema({
     },
     action: {
         type: String,
-        enum: ['account_verification', 'event_booking'],
+        enum: ["account_verification", "event_booking"],
         required: true,
     },
     createdAt: {
         type: Date,
         default: Date.now,
-        expires: 300, // OTP expires after 5 minutes
+        expires: 300, // MongoDB TTL index: auto-deletes document after 300 seconds (5 mins)
     },
 });
 
-const Otp = mongoose.model('Otp', otpSchema);
+// ATOMIC UNIQUENESS PER ACTION
+// Ensures only ONE active OTP can exist per email + action pair at any time.
+// Also speeds up `findOneAndUpdate` and `findOneAndDelete` queries.
+otpSchema.index({ email: 1, action: 1 }, { unique: true });
+
+const Otp = mongoose.model("Otp", otpSchema);
 export default Otp;
