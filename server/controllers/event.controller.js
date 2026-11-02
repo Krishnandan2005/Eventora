@@ -3,18 +3,35 @@ import Event from '../models/Event.models.js';
 // get all events
 export const getAllEvents = async (req, res) => {
     try {
-        // add filters whichever you want
+        // Prevent browser/proxy 304 caching on dynamic queries
+        res.set('Cache-Control', 'no-store');
+
+        const { search, category, location, ticketPrice } = req.query;
         const filters = {};
-        if (req.query.category) {
-            filters.category = req.query.category;
+
+        // 1. Global Search (Title, Description, Category, Location)
+        if (search && search.trim() !== '') {
+            const regex = new RegExp(search.trim(), 'i');
+            filters.$or = [
+                { title: regex },
+                { description: regex },
+                { category: regex },
+                { location: regex }
+            ];
         }
-        if (req.query.location) {
-            filters.location = req.query.location;
+
+        // 2. Specific Field Filters
+        if (category) {
+            filters.category = { $regex: new RegExp(`^${category.trim()}$`, 'i') };
         }
-        if (req.query.ticketPrice) {
-            filters.ticketPrice = req.query.ticketPrice;
+        if (location) {
+            filters.location = { $regex: new RegExp(location.trim(), 'i') };
         }
-        const events = await Event.find(filters);
+        if (ticketPrice !== undefined && ticketPrice !== '') {
+            filters.ticketPrice = Number(ticketPrice);
+        }
+
+        const events = await Event.find(filters).sort({ date: 1 });
         res.json(events);
     } catch (error) {
         res.status(500).json({ error: error.message });
